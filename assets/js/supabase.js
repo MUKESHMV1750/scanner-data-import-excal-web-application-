@@ -6,8 +6,8 @@
  */
 
 const STORAGE_KEYS = {
-  SUPABASE_URL: 'book_scanner_supabase_url',
-  SUPABASE_KEY: 'book_scanner_supabase_key',
+  SUPABASE_URL: 'https://bjmdxtrcbyttiokmjklo.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_5puyuv7p3f5X6x1HbDwbyA_fE7v9Ivn',
   LOCAL_BOOKS: 'book_scanner_local_books_v1',
   LOCAL_SETTINGS: 'book_scanner_settings'
 };
