@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Book Content Scanner & Excel Data Management System</title>
+
+  <!-- External Libraries via CDN -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <link rel="stylesheet" href="assets/css/scanner.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+
+  <div class="app-layout">
+
+    <!-- Desktop Sidebar Navigation -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <h1>Smart Book</h1>
+          <span>Scanner & Excel System</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Menu</div>
+        <a class="nav-item active" data-route="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+          Dashboard
+        </a>
+        <a class="nav-item" data-route="scanner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          Scan Book (Lens)
+          <span class="badge">OCR</span>
+        </a>
+        <a class="nav-item" data-route="books">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Book Records
+        </a>
+
+        <div class="nav-section-title">Data Management</div>
+        <a class="nav-item" data-route="import">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Import Excel
+        </a>
+        <a class="nav-item" id="exportAllBooksBtn" style="cursor: pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Export Excel (.xlsx)
+        </a>
+        <a class="nav-item" data-route="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Supabase Settings
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="storage-badge">
+          <div class="status-dot" id="storageStatusDot"></div>
+          <span id="storageStatusText">Local Database Mode</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Application Region -->
+    <main class="app-main">
+
+      <!-- Sticky Topbar -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title-box">
+            <h2 id="topbarPageTitle">Dashboard</h2>
+            <p id="topbarPageSubtitle">Library Overview & Scanner Analytics</p>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="btn btn-secondary btn-sm" id="downloadTemplateBtn" title="Download Excel template matching the 27 columns">
+            📥 Sample Template (.xlsx)
+          </button>
+          <button class="btn-scan-quick" data-action="navigate" data-target="scanner">
+            📷 Scan Book
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Views Container -->
+      <div class="content-body">
+
+        <!-- ==========================================
+             VIEW 1: DASHBOARD
+             ========================================== -->
+        <section class="view-section active" id="view-dashboard">
+          
+          <!-- Hero Banner -->
+          <div class="dashboard-hero">
+            <div class="hero-text">
+              <h2>Smart Book Content Scanner</h2>
+              <p>Scan physical books with camera OCR, select text with Google Lens-like precision, auto-map into all 27 standard Excel catalog fields, and manage Supabase cloud storage.</p>
+            </div>
+            <div class="hero-actions">
+              <button class="btn-hero-primary" data-action="navigate" data-target="scanner">
+                📷 Start Scanning
+              </button>
+              <button class="btn-hero-secondary" data-action="navigate" data-target="import">
+                📤 Import Excel
+              </button>
+            </div>
+          </div>
+
+          <!-- Statistics Cards Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-info">
+                <p>Total Books Stored</p>
+                <h3 id="statTotalBooks">0</h3>
+                <span class="stat-trend positive">✓ Fully indexed in database</span>
+              </div>
+              <div class="stat-icon icon-teal">📚</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <p>Camera Scanned</p>
+                <h3 id="statScanned">0</h3>
+                <span class="stat-trend positive">📷 Captured via OCR</span>
+              </div>
+              <div class="stat-icon icon-navy">🔍</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <p>Pending Verification</p>
+                <h3 id="statPending">0</h3>
+                <span class="stat-trend neutral">⚠️ Awaiting librarian check</span>
+              </div>
+              <div class="stat-icon icon-amber">⏳</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <p>Departments</p>
+                <h3 id="statDepartments">0</h3>
+                <span class="stat-trend positive">🏛️ Academic sections</span>
+              </div>
+              <div class="stat-icon icon-cyan">🏷️</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Bar -->
+          <div class="quick-actions-bar">
+            <button class="action-pill-btn" data-action="navigate" data-target="scanner">
+              <i>📷</i> New Book Scan
+            </button>
+            <button class="action-pill-btn" data-action="navigate" data-target="books">
+              <i>📋</i> View All 27 Columns
+            </button>
+            <button class="action-pill-btn" data-action="navigate" data-target="import">
+              <i>📥</i> Import Template Excel
+            </button>
+            <button class="action-pill-btn" id="quickExportAllBtn" onclick="document.getElementById('exportAllBooksBtn').click()">
+              <i>📊</i> Export All (.xlsx)
+            </button>
+          </div>
+
+          <!-- Recent Scanned Books Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><span>📖</span> Recently Scanned & Added Books</h3>
+              <button class="btn btn-secondary btn-sm" data-action="navigate" data-target="books">
+                View Full Catalog →
+              </button>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Access No</th>
+                      <th>Book Details</th>
+                      <th>ISBN</th>
+                      <th>Publisher</th>
+                      <th>Year</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentBooksTableBody">
+                    <!-- Populated dynamically by dashboard.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 2: MOBILE SCANNER & GOOGLE LENS MAPPING
+             ========================================== -->
+        <section class="view-section" id="view-scanner">
+          
+          <div class="scanner-grid">
+            
+            <!-- Left Side: Camera & Google Lens Interactive Image -->
+            <div>
+              
+              <!-- Camera Mode Viewport -->
+              <div class="camera-box-card" id="cameraViewSection">
+                <div class="camera-viewport-wrap">
+                  <video id="cameraVideo" autoplay playsinline muted></video>
+                  <canvas id="scannerCanvas"></canvas>
+                  
+                  <!-- Framing Guide Overlay for Book Pages -->
+                  <div class="viewfinder-guide-overlay">
+                    <div class="guide-tip-pill">Align book page or title / copyright page here</div>
+                  </div>
+                </div>
+
+                <!-- Camera Controls Toolbar -->
+                <div class="camera-controls-bar">
+                  <button class="camera-sub-btn" id="torchBtn" title="Toggle Flash / Torch">
+                    💡
+                  </button>
+
+                  <button class="camera-shutter-btn" id="shutterBtn" title="Capture Book Page">
+                    <div class="camera-shutter-inner"></div>
+                  </button>
+
+                  <button class="camera-sub-btn" id="switchCamBtn" title="Switch Front/Rear Camera">
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              <!-- Captured Preview + Google Lens Interactive Overlay Mode -->
+              <div class="card" id="capturedViewSection" style="display: none; position: relative;">
+                <div class="card-header">
+                  <h3>
+                    <span>🔍</span> Google Lens-Like Text Selection
+                  </h3>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-sm" id="rescanBtn">
+                      🔄 Re-Scan
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="autoMapBtn">
+                      ✨ Auto-Map Fields
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                    Tap any highlighted word/text box below to assign it directly into your 27 Excel fields!
+                  </p>
+
+                  <!-- Lens Interactive Container -->
+                  <div class="lens-preview-container" id="lensContainer">
+                    <img id="capturedImagePreview" alt="Scanned book preview">
+                    <div class="lens-overlay-layer" id="lensOverlay"></div>
+
+                    <!-- Lens Floating Assign Popover -->
+                    <div class="lens-selection-popover" id="lensPopover">
+                      <div class="lens-popover-text">"Selected Text"</div>
+                      <div class="lens-popover-buttons">
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Title')">📌 Title</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Author 1')">👤 Author 1</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('ISBN')">🏷️ ISBN</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Publisher')">🏢 Publisher</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Year')">📅 Year</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Edition')">📖 Edition</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Call No/DC')">🔢 Call No</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Price')">💰 Price</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Extracted Word Chips -->
+                  <div style="margin-top: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">
+                        Recognized Text Tokens (Tap to assign):
+                      </span>
+                      <button class="btn btn-secondary btn-sm" id="copyOcrTextBtn" style="padding: 3px 8px; font-size: 11px;">
+                        Copy Raw Text
+                      </button>
+                    </div>
+                    <div class="extracted-chips-container" id="extractedChipsContainer"></div>
+                  </div>
+
+                  <!-- Raw OCR Output Accordion/Box -->
+                  <details style="margin-top: 14px;">
+                    <summary style="font-size: 12px; color: var(--text-muted); cursor: pointer; font-weight: 600;">
+                      View Full Extracted OCR Text
+                    </summary>
+                    <div class="extracted-text-box" id="extractedTextOutput" style="margin-top: 8px;"></div>
+                  </details>
+                </div>
+              </div>
+
+              <!-- Upload File Alternative Card -->
+              <div class="card" style="margin-top: 16px;">
+                <div class="card-body" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <strong style="font-size: 14px; color: var(--primary-navy);">Have a photo or scanned file?</strong>
+                    <p style="font-size: 12px; color: var(--text-muted);">Upload directly from camera roll or computer</p>
+                  </div>
+                  <div>
+                    <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin-bottom: 0;">
+                      📁 Upload Image
+                      <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Side: 27 Excel Fields Structured Form -->
+            <div>
+              <div class="card">
+                <div class="card-header">
+                  <h3>
+                    <span>📝</span> Book Information (27 Columns)
+                  </h3>
+                  <span id="editingIndicator" class="badge-tag tag-amber" style="display: none;">
+                    Editing Existing
+                  </span>
+                </div>
+
+                <div class="card-body">
+                  <form id="bookDetailsForm">
+
+                    <!-- Tabbed Categorization for 27 Fields -->
+                    <div class="form-section-tabs">
+                      <button type="button" class="form-tab-btn active" data-target="tab-core">
+                        Core Info (Title/Author)
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-pub">
+                        Publication & Physical
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-dept">
+                        Classification & Dept
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-extra">
+                        Notes & Inventory
+                      </button>
+                    </div>
+
+                    <!-- TAB 1: Core Bibliographic Fields -->
+                    <div class="form-tab-pane active" id="tab-core">
+                      <div class="form-group">
+                        <label class="form-label">Title <span class="required">*</span></label>
+                        <input type="text" id="field_title" class="form-control" placeholder="Book Title" required>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Author 1</label>
+                          <input type="text" id="field_author_1" class="form-control" placeholder="Primary Author">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">ISBN</label>
+                          <input type="text" id="field_isbn" class="form-control" placeholder="978-X-XX-XXXXXX-X">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Auth 2</label>
+                          <input type="text" id="field_auth_2" class="form-control" placeholder="Second Author">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Auth 3</label>
+                          <input type="text" id="field_auth_3" class="form-control" placeholder="Third Author">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Year</label>
+                          <input type="number" id="field_year" class="form-control" placeholder="e.g. 2024">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Edition</label>
+                          <input type="text" id="field_edition" class="form-control" placeholder="e.g. 3rd Edition">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label">Auth Type ACEIT</label>
+                        <input type="text" id="field_auth_type_aceit" class="form-control" placeholder="e.g. Faculty / Donor / Standard">
+                      </div>
+                    </div>
+
+                    <!-- TAB 2: Publication & Physical -->
+                    <div class="form-tab-pane" id="tab-pub">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Publisher</label>
+                          <input type="text" id="field_publisher" class="form-control" placeholder="e.g. Academic Press">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Publisher Place</label>
+                          <input type="text" id="field_publisher_place" class="form-control" placeholder="e.g. Cambridge, MA">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Price</label>
+                          <input type="number" step="0.01" id="field_price" class="form-control" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Collation</label>
+                          <input type="text" id="field_collation" class="form-control" placeholder="e.g. xvi, 524 p. : ill. ; 24 cm">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label">Notes CD/Supplementary Book</label>
+                        <textarea id="field_notes_cd_supplementary_book" class="form-control" rows="2" placeholder="Companion CD, lab manual or digital access notes"></textarea>
+                      </div>
+                    </div>
+
+                    <!-- TAB 3: Classification & Department -->
+                    <div class="form-tab-pane" id="tab-dept">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Access No</label>
+                          <input type="text" id="field_access_no" class="form-control" placeholder="e.g. ACC-10492">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Call No/DC</label>
+                          <input type="text" id="field_call_no_dc" class="form-control" placeholder="e.g. 005.133 PY">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Department</label>
+                          <input type="text" id="field_department" class="form-control" placeholder="e.g. Computer Science & Engineering">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Department Code</label>
+                          <input type="text" id="field_department_code" class="form-control" placeholder="e.g. CSE">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Section</label>
+                          <input type="text" id="field_section" class="form-control" placeholder="e.g. Reference Section">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Section Code</label>
+                          <input type="text" id="field_section_code" class="form-control" placeholder="e.g. REF">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Subject-Code</label>
+                          <input type="text" id="field_subject_code" class="form-control" placeholder="e.g. CS-DS-01">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Date of Entry</label>
+                          <input type="date" id="field_date_of_entry" class="form-control">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- TAB 4: Extra Inventory & Transfer -->
+                    <div class="form-tab-pane" id="tab-extra">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Fund Code</label>
+                          <input type="text" id="field_fund_code" class="form-control" placeholder="e.g. FC-LIB-2024">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Dept Transfer No</label>
+                          <input type="text" id="field_dept_transfer_no" class="form-control" placeholder="e.g. TR-0891">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Transfer Status</label>
+                          <select id="field_transfer_status" class="form-control">
+                            <option value="Internal">Internal</option>
+                            <option value="External">External</option>
+                          </select>
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Serial No</label>
+                          <input type="text" id="field_serial_no" class="form-control" placeholder="e.g. SN-2026-001">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Location</label>
+                          <input type="text" id="field_location" class="form-control" placeholder="e.g. Shelf A-14, Tier 2">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Keyword (650 -e relator term)</label>
+                          <input type="text" id="field_keyword" class="form-control" placeholder="e.g. Data science, Python">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Form Action Buttons -->
+                    <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
+                      <button type="submit" class="btn btn-primary" style="flex: 2;">
+                        💾 Save to Database
+                      </button>
+                      <button type="button" class="btn btn-navy" id="saveAndNextBtn" style="flex: 2;">
+                        ⏩ Save & Scan Next
+                      </button>
+                      <button type="button" class="btn btn-secondary" id="clearFormBtn" style="flex: 1;">
+                        Clear
+                      </button>
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- OCR Progress Overlay (Visible during Tesseract recognition) -->
+          <div class="ocr-progress-overlay" id="ocrProgressOverlay">
+            <div class="ocr-spinner"></div>
+            <h3 style="font-size: 18px; margin-bottom: 6px;">Extracting Text from Book Page</h3>
+            <p id="ocrProgressText" style="font-size: 13px; color: #94a3b8;">Processing high-resolution OCR...</p>
+            <div class="ocr-progress-bar-wrap">
+              <div class="ocr-progress-fill" id="ocrProgressBar"></div>
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 3: BOOK MANAGEMENT (CRUD TABLE)
+             ========================================== -->
+        <section class="view-section" id="view-books">
+          
+          <div class="card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 260px;">
+                <input type="text" id="bookSearchInput" class="form-control" placeholder="Search by Title, Author, ISBN, Publisher, Call No...">
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-primary btn-sm" data-action="navigate" data-target="scanner">
+                  + Add / Scan Book
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('exportAllBooksBtn').click()">
+                  📊 Export .xlsx
+                </button>
+              </div>
+            </div>
+
+            <!-- Selected items floating action bar -->
+            <div id="selectedItemsToolbar" style="display: none; background: #0f172a; color: white; padding: 10px 20px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color);">
+              <span id="selectedCountBadge" style="font-weight: 600; font-size: 13px;">0 selected</span>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary btn-sm" onclick="window.booksManager.exportSelectedBooks()">
+                  Export Selected to Excel
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">
+                        <input type="checkbox" id="selectAllBooks">
+                      </th>
+                      <th>Access No</th>
+                      <th>Title & Author</th>
+                      <th>ISBN</th>
+                      <th>Publisher</th>
+                      <th>Year</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="booksTableBody">
+                    <!-- Populated dynamically by books.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card-body" id="booksPagination" style="border-top: 1px solid var(--border-color); padding: 14px 24px;">
+              <!-- Pagination controls populated dynamically -->
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 4: EXCEL IMPORT
+             ========================================== -->
+        <section class="view-section" id="view-import">
+          
+          <div class="card">
+            <div class="card-header">
+              <h3><span>📥</span> Import Existing Excel Workbook (Sheet1)</h3>
+              <button class="btn btn-secondary btn-sm" id="downloadTemplateBtn2" onclick="document.getElementById('downloadTemplateBtn').click()">
+                Download 27-Column Template
+              </button>
+            </div>
+            
+            <div class="card-body">
+              <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">
+                Upload your <code>Donated book list 2026 Nov(1).xlsx</code> file directly. The system automatically detects all 27 column headers, checks for duplicate ISBN / Access numbers, and stores records into Supabase PostgreSQL.
+              </p>
+
+              <!-- Drag and Drop Zone -->
+              <div id="excelDropZone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-lg); padding: 50px 20px; text-align: center; cursor: pointer; transition: var(--transition); background: var(--bg-subtle);">
+                <div style="font-size: 48px; margin-bottom: 12px;">📊</div>
+                <h4 style="font-size: 16px; font-weight: 700; color: var(--primary-navy); margin-bottom: 6px;">
+                  Drag and drop your Excel file here, or click to browse
+                </h4>
+                <p style="font-size: 13px; color: var(--text-muted);">
+                  Supports .xlsx and .xls workbooks matching the 27 column template
+                </p>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+              </div>
+
+              <!-- Import Preview Section -->
+              <div id="importPreviewSection" style="display: none; margin-top: 28px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <h4 style="font-size: 16px; font-weight: 700; color: var(--primary-navy);">
+                      Import Preview: <span id="importTotalCount">0</span> rows detected
+                    </h4>
+                    <p style="font-size: 12px; color: var(--text-muted);">
+                      <span id="importDupCount">0</span> potential duplicate records flagged.
+                    </p>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 16px;">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                      <input type="checkbox" id="skipDuplicatesCheck" checked>
+                      Skip Duplicates
+                    </label>
+
+                    <button class="btn btn-primary" id="commitImportBtn">
+                      Confirm & Import Records
+                    </button>
+                  </div>
+                </div>
+
+                <div class="table-responsive" style="border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: 380px; overflow-y: auto;">
+                  <table class="modern-table">
+                    <thead>
+                      <tr>
+                        <th>Access No</th>
+                        <th>Title</th>
+                        <th>Author 1</th>
+                        <th>ISBN</th>
+                        <th>Publisher</th>
+                        <th>Year</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="importPreviewTableBody">
+                      <!-- Filled dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 5: SETTINGS & SUPABASE CONFIG
+             ========================================== -->
+        <section class="view-section" id="view-settings">
+          
+          <div class="card">
+            <div class="card-header">
+              <h3><span>⚙️</span> Supabase Database & Storage Configuration</h3>
+            </div>
+            
+            <div class="card-body">
+              <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">
+                Connect your Supabase project to enable cloud synchronization, PostgreSQL persistence across all devices, and image storage in the <code>book-scans</code> bucket.
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input type="text" id="supabaseUrlInput" class="form-control" placeholder="https://xyzcompany.supabase.co">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Anon Public Key</label>
+                <input type="password" id="supabaseKeyInput" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                <small style="color: var(--text-muted); font-size: 12px;">
+                  Use the <code>anon public</code> key. Never provide your service_role secret key in the frontend client.
+                </small>
+              </div>
+
+              <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" id="saveSupabaseSettingsBtn">
+                  Save Credentials
+                </button>
+                <button type="button" class="btn btn-secondary" id="testSupabaseConnectionBtn">
+                  Test Connection
+                </button>
+              </div>
+
+              <hr style="margin: 32px 0; border: none; border-top: 1px solid var(--border-color);">
+
+              <h4 style="font-size: 15px; font-weight: 700; color: var(--primary-navy); margin-bottom: 12px;">
+                Local Storage & Demo Data Maintenance
+              </h4>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                Manage offline browser cache and sample academic records.
+              </p>
+              
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" id="resetSampleDataBtn">
+                  🔄 Re-Seed Academic Sample Books
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="clearLocalDataBtn">
+                  🗑️ Clear Local Cache
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav">
+    <a class="mobile-nav-item active" data-route="dashboard">
+      <span style="font-size: 18px;">📊</span>
+      <span>Dashboard</span>
+    </a>
+    <a class="mobile-nav-item scan-primary" data-route="scanner">
+      <div class="scan-circle-btn">📷</div>
+      <span>Scan</span>
+    </a>
+    <a class="mobile-nav-item" data-route="books">
+      <span style="font-size: 18px;">📚</span>
+      <span>Records</span>
+    </a>
+    <a class="mobile-nav-item" data-route="import">
+      <span style="font-size: 18px;">📥</span>
+      <span>Import</span>
+    </a>
+  </nav>
+
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+
+  <!-- Full 27-Column Book Details Modal -->
+  <div class="modal-overlay" id="bookDetailsModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>Complete Book Catalog Profile</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="bookDetailsModalContent">
+        <!-- Rendered dynamically by books.js -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Application Entry Point Script (ES Module) -->
+  <script type="module" src="assets/js/app.js"></script>
+
+</body>
+</html>

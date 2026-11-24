@@ -1,0 +1,113 @@
+/* ==============================================================================
+   Responsive.css - Mobile First & Cross Device Adaptations
+   ============================================================================== */
+
+@media (max-width: 992px) {
+  .app-sidebar {
+    transform: translateX(-100%);
+  }
+
+  .app-sidebar.show {
+    transform: translateX(0);
+  }
+
+  .app-main {
+    margin-left: 0;
+    padding-bottom: var(--mobile-bottom-nav-height);
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+  }
+
+  .content-body {
+    padding: 16px;
+  }
+
+  .dashboard-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .hero-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-topbar {
+    padding: 0 16px;
+  }
+
+  .page-title-box h2 {
+    font-size: 17px;
+  }
+
+  .page-title-box p {
+    display: none;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-info h3 {
+    font-size: 22px;
+  }
+
+  .stat-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
+
+  .camera-viewport-wrap {
+    height: 340px;
+  }
+
+  .modern-table th,
+  .modern-table td {
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .camera-viewport-wrap {
+    height: 300px;
+  }
+
+  .toast-container {
+    left: 16px;
+    right: 16px;
+    bottom: 80px;
+  }
+
+  .toast {
+    min-width: auto;
+    width: 100%;
+  }
+}
