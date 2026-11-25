@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Book Content Scanner & Excel Data Management System</title>
+
+  <!-- External Libraries via CDN -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <link rel="stylesheet" href="assets/css/scanner.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+
+  <!-- Immediate Universal Navigation, Theme & Sample Purge Helper -->
+  <script>
+    (function() {
+      // 1. Theme initialization
+      var saved = localStorage.getItem('smartbook_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+
+      // 2. Immediate auto-purge of any sample/demo books from localStorage
+      try {
+        var sampleNos = ['ACC-10492', 'ACC-10493', 'ACC-10494', 'ACC-10495', 'ACC-10496'];
+        var sampleTitles = [
+          'introduction to data science & python analytics',
+          'modern web technology & cloud architecture',
+          'principles of digital electronics and embedded systems',
+          'digital signal processing: fundamentals and applications',
+          'advanced computer aided engineering and simulation'
+        ];
+        var keysToCheck = ['book_scanner_local_books_v1', 'smartbook_local_books', 'smartbook_books'];
+        keysToCheck.forEach(function(k) {
+          var raw = localStorage.getItem(k);
+          if (raw) {
+            var list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              var clean = list.filter(function(b) {
+                if (!b) return false;
+                if (b.access_no && sampleNos.indexOf(String(b.access_no).trim()) !== -1) return false;
+                if (b.title && sampleTitles.indexOf(String(b.title).trim().toLowerCase()) !== -1) return false;
+                return true;
+              });
+              localStorage.setItem(k, JSON.stringify(clean));
+            }
+          }
+        });
+      } catch(e) {}
+    })();
+
+    window.toggleTheme = function() {
+      var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('smartbook_theme', next); } catch(e){}
+
+      var text = document.getElementById('sidebarThemeText');
+      var icon = document.getElementById('sidebarThemeIcon');
+      var badge = document.getElementById('sidebarThemeBadge');
+      if (text) text.textContent = next === 'dark' ? 'Light Mode' : 'Dark Mode';
+      if (icon) icon.textContent = next === 'dark' ? '☀️' : '🌙';
+      if (badge) badge.textContent = next === 'dark' ? 'ON' : 'OFF';
+
+      if (window.app && typeof window.app.showToast === 'function') {
+        window.app.showToast('Switched to ' + (next === 'dark' ? 'Dark' : 'Light') + ' Mode', 'info');
+      }
+    };
+
+    window.toggleSidebar = function(force) {
+      var s = document.getElementById('appSidebar');
+      var b = document.getElementById('sidebarBackdrop');
+      if (!s) return;
+      var willOpen = force !== undefined ? !!force : !s.classList.contains('show');
+      if (willOpen) {
+        s.classList.add('show');
+        if (b) b.classList.add('show');
+      } else {
+        s.classList.remove('show');
+        if (b) b.classList.remove('show');
+      }
+    };
+
+    window.switchScannerMobileMode = function(mode) {
+      var leftCol = document.getElementById('scannerLeftCol');
+      var rightCol = document.getElementById('scannerRightCol');
+      var switcher = document.getElementById('scannerMobileSwitcher');
+      var jumpBar = document.getElementById('scannerJumpBar');
+      var backBar = document.getElementById('scannerBackCameraBar');
+      if (!leftCol || !rightCol) return;
+
+      if (switcher) {
+        switcher.querySelectorAll('.scanner-mode-tab').forEach(function(tab) {
+          tab.classList.toggle('active', tab.dataset.mode === mode);
+        });
+      }
+
+      if (mode === 'camera') {
+        leftCol.style.display = 'block';
+        rightCol.style.display = 'none';
+        if (jumpBar) jumpBar.style.display = 'block';
+        if (backBar) backBar.style.display = 'none';
+      } else if (mode === 'form') {
+        leftCol.style.display = 'none';
+        rightCol.style.display = 'block';
+        if (jumpBar) jumpBar.style.display = 'none';
+        if (backBar) backBar.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else { // 'both'
+        leftCol.style.display = 'block';
+        rightCol.style.display = 'block';
+        if (jumpBar) jumpBar.style.display = 'none';
+        if (backBar) backBar.style.display = 'none';
+      }
+    };
+
+    window.switchView = function(route) {
+      if (window.app && typeof window.app.navigate === 'function') {
+        window.app.navigate(route);
+        return;
+      }
+      // Instant direct fallback router
+      window.location.hash = route;
+      document.querySelectorAll('.nav-item').forEach(function(item) {
+        item.classList.toggle('active', item.dataset.route === route);
+      });
+      document.querySelectorAll('.mobile-nav-item').forEach(function(item) {
+        item.classList.toggle('active', item.dataset.route === route);
+      });
+      document.querySelectorAll('.view-section').forEach(function(view) {
+        view.classList.toggle('active', view.id === 'view-' + route);
+      });
+      var titleMap = {
+        dashboard: ['Dashboard', 'Library Overview & Scanner Analytics'],
+        scanner: ['Mobile Book Scanner', 'Scan printed pages with camera and map to 27 Excel fields'],
+        books: ['Book Records', 'Manage, search, edit and verify stored book records'],
+        import: ['Import Excel', 'Upload Donated book list 2026 Nov(1).xlsx template'],
+        settings: ['Settings', 'Configure Supabase Database, Storage & Backup']
+      };
+      if (titleMap[route]) {
+        var t = document.getElementById('topbarPageTitle');
+        var s = document.getElementById('topbarPageSubtitle');
+        if (t) t.textContent = titleMap[route][0];
+        if (s) s.textContent = titleMap[route][1];
+      }
+      var sidebar = document.getElementById('appSidebar');
+      if (sidebar) sidebar.classList.remove('show');
+      var backdrop = document.getElementById('sidebarBackdrop');
+      if (backdrop) backdrop.classList.remove('show');
+    };
+
+    window.exportAllExcel = async function() {
+      if (window.ExcelExporter && typeof window.ExcelExporter.exportAll === 'function') {
+        try {
+          var count = await window.ExcelExporter.exportAll();
+          if (window.app && window.app.showToast) {
+            window.app.showToast('Exported ' + count + ' books to Excel/CSV file!', 'success');
+          } else {
+            alert('Exported ' + count + ' books to Excel / CSV file!');
+          }
+        } catch (e) {
+          if (window.app && window.app.showToast) {
+            window.app.showToast('Export failed: ' + e.message, 'error');
+          } else {
+            alert('Export failed: ' + e.message);
+          }
+        }
+      } else {
+        alert('Export engine is initializing, please try again in a moment.');
+      }
+    };
+
+    window.addEventListener('hashchange', function() {
+      var route = window.location.hash.replace('#', '') || 'dashboard';
+      window.switchView(route);
+    });
+
+    window.addEventListener('DOMContentLoaded', function() {
+      var initialRoute = window.location.hash.replace('#', '') || 'dashboard';
+      if (initialRoute && initialRoute !== 'dashboard') {
+        window.switchView(initialRoute);
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <div class="app-layout">
+
+    <!-- Desktop Sidebar Navigation (Warm Cream Background) -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <h1>Shelves.</h1>
+          <span>Smart Library System</span>
+        </div>
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" onclick="window.toggleSidebar(false)" aria-label="Close menu">✕</button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Menu</div>
+        <a class="nav-item active" data-route="dashboard" href="#dashboard" onclick="window.switchView('dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+          Dashboard
+        </a>
+        <a class="nav-item" data-route="scanner" href="#scanner" onclick="window.switchView('scanner')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          Scan Book (Lens)
+          <span class="badge">OCR</span>
+        </a>
+        <a class="nav-item" data-route="books" href="#books" onclick="window.switchView('books')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Book Records
+        </a>
+
+        <div class="nav-section-title">Data Management</div>
+        <a class="nav-item" data-route="import" href="#import" onclick="window.switchView('import')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Import Excel
+        </a>
+        <a class="nav-item" id="exportAllBooksBtn" style="cursor: pointer;" onclick="window.exportAllExcel()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Export Excel (.xlsx)
+        </a>
+        <a class="nav-item" data-route="settings" href="#settings" onclick="window.switchView('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Supabase Settings
+        </a>
+      </nav>
+
+      <!-- Profile & Promo Section -->
+      <div class="sidebar-footer">
+        <div class="sidebar-profile-card">
+          <div class="sidebar-avatar">
+            <span style="font-size: 18px;">👨‍💼</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div class="sidebar-user-name">Frank Gilmour</div>
+            <div class="sidebar-user-role">Head Librarian</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 2px 4px;">
+          <a href="javascript:void(0)" onclick="window.toggleTheme()" style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-decoration: none; padding: 5px 8px; border-radius: 6px;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span id="sidebarThemeIcon">🌙</span> <span id="sidebarThemeText">Dark Mode</span>
+            </span>
+            <span class="theme-badge" id="sidebarThemeBadge">OFF</span>
+          </a>
+          <a href="#settings" onclick="window.switchView('settings')" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-decoration: none; padding: 5px 8px; border-radius: 6px;">
+            <span>➕</span> Add account
+          </a>
+          <a href="#settings" onclick="window.switchView('settings')" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-decoration: none; padding: 5px 8px; border-radius: 6px;">
+            <span>🚪</span> Log out
+          </a>
+        </div>
+
+        <div class="sidebar-promo-card">
+          <div class="sidebar-promo-avatars">
+            <div class="promo-avatar-bubble" style="background: #FEB47B;">👨‍🎓</div>
+            <div class="promo-avatar-bubble" style="background: #DDB9E8;">👩‍🏫</div>
+            <div class="promo-avatar-bubble" style="background: #6EE7B7;">👨‍💼</div>
+          </div>
+          <div class="sidebar-promo-title">Join premium plan</div>
+          <button class="btn-promo-learn" onclick="window.switchView('settings')">Learn more</button>
+        </div>
+
+        <div class="storage-badge">
+          <div class="status-dot" id="storageStatusDot"></div>
+          <span id="storageStatusText">Local Database Mode</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="window.toggleSidebar(false)"></div>
+
+    <!-- Main Content Application Region -->
+    <main class="app-main">
+
+      <!-- Sticky Topbar (Matching Reference UI) -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle Menu" onclick="window.toggleSidebar();">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          
+          <!-- Wide Pill Search Input -->
+          <div class="topbar-search-wrap">
+            <span class="topbar-search-icon">🔍</span>
+            <input type="text" class="topbar-search-input" placeholder="Search books, authors..." oninput="if(window.booksManager){var el=document.getElementById('bookSearchInput'); if(el){el.value=this.value; window.booksManager.applyFilters();}}">
+            <span style="font-size: 15px; color: var(--text-secondary); cursor: pointer;" title="Filter options" onclick="window.switchView('books')">🎛️</span>
+          </div>
+
+          <div class="page-title-box" style="display: none;">
+            <h2 id="topbarPageTitle">Dashboard</h2>
+            <p id="topbarPageSubtitle">Library Overview & Scanner Analytics</p>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="pill-select-btn" onclick="window.switchView('settings')" title="Manage Plan & Sync">
+            Subscription
+          </button>
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode" onclick="window.toggleTheme()" aria-label="Toggle Theme">
+            <span class="theme-icon sun-icon">☀️</span>
+            <span class="theme-icon moon-icon">🌙</span>
+          </button>
+          <button class="topbar-bell-btn" title="System Notifications">
+            🔔
+            <span class="topbar-bell-dot"></span>
+          </button>
+          <button class="btn-scan-quick" data-action="navigate" data-target="scanner" onclick="window.switchView('scanner')">
+            📷 Scan Book
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Views Container -->
+      <div class="content-body">
+
+        <!-- ==========================================
+             VIEW 1: DASHBOARD (2-Column Reference Layout)
+             ========================================== -->
+        <section class="view-section active" id="view-dashboard">
+          
+          <div class="dashboard-reference-grid">
+            
+            <!-- Left Main Column (68% width) -->
+            <div class="dashboard-main-col">
+              
+              <!-- Book Catalog & Total Entries Card -->
+              <div class="analytics-hero-card">
+                <div class="analytics-card-header">
+                  <div class="analytics-title-group">
+                    <h3>Total Entries</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                      Library Database Records Indexed
+                    </p>
+                  </div>
+                  <div class="analytics-header-controls">
+                    <button class="pill-select-btn" onclick="window.switchView('books')">
+                      View All Records →
+                    </button>
+                  </div>
+                </div>
+
+                <div class="analytics-metric-row">
+                  <div class="analytics-big-number" id="statHeroTotal">0</div>
+                  <div class="chart-legend-wrap">
+                    <span class="chart-legend-item">
+                      <span class="legend-dot-lavender"></span> 2025
+                    </span>
+                    <span class="chart-legend-item">
+                      <span class="legend-dot-gold"></span> 2026
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 12-Month Dual Bar Chart (Purple & Gold Bars) -->
+                <div class="dual-bar-chart-container">
+                  <div class="chart-y-axis">
+                    <span>2k</span>
+                    <span>1.5k</span>
+                    <span>1k</span>
+                    <span>0</span>
+                  </div>
+
+                  <div class="chart-bars-wrap">
+                    <!-- Jan -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 48%;" title="Jan 2025: 980"></div>
+                        <div class="bar-pill bar-gold" style="height: 62%;" title="Jan 2026: 1240"></div>
+                      </div>
+                      <span class="month-label">Jan</span>
+                    </div>
+
+                    <!-- Feb -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender active-accent" style="height: 72%;" title="Feb 2025: 1450"></div>
+                        <div class="bar-pill bar-gold" style="height: 86%;" title="Feb 2026: 1720"></div>
+                      </div>
+                      <span class="month-label">Feb</span>
+                    </div>
+
+                    <!-- Mar -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 38%;" title="Mar 2025: 760"></div>
+                        <div class="bar-pill bar-gold" style="height: 54%;" title="Mar 2026: 1080"></div>
+                      </div>
+                      <span class="month-label">Mar</span>
+                    </div>
+
+                    <!-- Apr -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 45%;" title="Apr 2025: 900"></div>
+                        <div class="bar-pill bar-gold" style="height: 68%;" title="Apr 2026: 1360"></div>
+                      </div>
+                      <span class="month-label">Apr</span>
+                    </div>
+
+                    <!-- May -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 28%;" title="May 2025: 560"></div>
+                        <div class="bar-pill bar-gold" style="height: 48%;" title="May 2026: 960"></div>
+                      </div>
+                      <span class="month-label">May</span>
+                    </div>
+
+                    <!-- Jun -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 35%;" title="Jun 2025: 700"></div>
+                        <div class="bar-pill bar-gold" style="height: 60%;" title="Jun 2026: 1200"></div>
+                      </div>
+                      <span class="month-label">Jun</span>
+                    </div>
+
+                    <!-- Jul -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender active-accent" style="height: 78%;" title="Jul 2025: 1560"></div>
+                        <div class="bar-pill bar-gold" style="height: 94%;" title="Jul 2026: 1880"></div>
+                      </div>
+                      <span class="month-label">Jul</span>
+                    </div>
+
+                    <!-- Aug -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 52%;" title="Aug 2025: 1040"></div>
+                        <div class="bar-pill bar-gold" style="height: 82%;" title="Aug 2026: 1640"></div>
+                      </div>
+                      <span class="month-label">Aug</span>
+                    </div>
+
+                    <!-- Sep -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 40%;" title="Sep 2025: 800"></div>
+                        <div class="bar-pill bar-gold" style="height: 64%;" title="Sep 2026: 1280"></div>
+                      </div>
+                      <span class="month-label">Sep</span>
+                    </div>
+
+                    <!-- Oct -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 32%;" title="Oct 2025: 640"></div>
+                        <div class="bar-pill bar-gold" style="height: 50%;" title="Oct 2026: 1000"></div>
+                      </div>
+                      <span class="month-label">Oct</span>
+                    </div>
+
+                    <!-- Nov -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender active-accent" style="height: 66%;" title="Nov 2025: 1320"></div>
+                        <div class="bar-pill bar-gold" style="height: 80%;" title="Nov 2026: 1600"></div>
+                      </div>
+                      <span class="month-label">Nov</span>
+                    </div>
+
+                    <!-- Dec -->
+                    <div class="chart-month-col">
+                      <div class="chart-bars-pair">
+                        <div class="bar-pill bar-lavender" style="height: 58%;" title="Dec 2025: 1160"></div>
+                        <div class="bar-pill bar-gold" style="height: 74%;" title="Dec 2026: 1480"></div>
+                      </div>
+                      <span class="month-label">Dec</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bottom Stats Row inside Card -->
+                <div class="analytics-stats-strip">
+                  <div class="stat-tile">
+                    <div class="stat-tile-left">
+                      <span>Total Books</span>
+                      <h4 id="statTotalBooks">0</h4>
+                    </div>
+                    <div class="stat-tile-trend up">
+                      Active
+                    </div>
+                  </div>
+
+                  <div class="stat-tile">
+                    <div class="stat-tile-left">
+                      <span>Scanned</span>
+                      <h4 id="statScanned">0</h4>
+                    </div>
+                    <div class="stat-tile-trend up">
+                      Lens
+                    </div>
+                  </div>
+
+                  <div class="stat-tile">
+                    <div class="stat-tile-left">
+                      <span>Pending</span>
+                      <h4 id="statPending">0</h4>
+                    </div>
+                    <div class="stat-tile-trend down">
+                      Review
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Hidden keeper for department counter JS binding -->
+                <span id="statDepartments" style="display: none;">0</span>
+              </div>
+
+              <!-- Books Circulated Recent Table Card -->
+              <div class="circulated-books-card">
+                <div class="circulated-card-header">
+                  <h3>Books circulated</h3>
+                  <button class="pill-select-btn" onclick="window.switchView('books')">
+                    Last Week ▾
+                  </button>
+                </div>
+                
+                <div class="table-responsive">
+                  <table class="circulated-table">
+                    <thead>
+                      <tr>
+                        <th>Member</th>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Return Date</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="recentBooksTableBody">
+                      <!-- Dynamically rendered: Only real entered records will show here -->
+                      <tr>
+                        <td colspan="5" style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+                          No books entered yet. Use "Scan Book" or "Import Excel" to begin adding your real catalog records.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Sidebar Column (32% width) -->
+            <div class="dashboard-side-col">
+              
+              <!-- Demands Card -->
+              <div class="demands-card">
+                <div class="demands-card-header">
+                  <h3>Demands</h3>
+                  <button class="icon-circle-btn" onclick="window.switchView('books')" title="View all trending">
+                    ↗
+                  </button>
+                </div>
+
+                <div class="demands-list">
+                  <div class="demand-item">
+                    <div class="demand-book-left">
+                      <div class="demand-book-cover cover-gradient-1">🌅</div>
+                      <div class="demand-meta">
+                        <div class="demand-title">We Are Powerful</div>
+                        <div class="demand-author">Marvin McKinney</div>
+                      </div>
+                    </div>
+                    <span class="demand-percent">12% ↗</span>
+                  </div>
+
+                  <div class="demand-item">
+                    <div class="demand-book-left">
+                      <div class="demand-book-cover cover-gradient-2">🪐</div>
+                      <div class="demand-meta">
+                        <div class="demand-title">New Planet</div>
+                        <div class="demand-author">Jane Cooper</div>
+                      </div>
+                    </div>
+                    <span class="demand-percent">22% ↗</span>
+                  </div>
+
+                  <div class="demand-item">
+                    <div class="demand-book-left">
+                      <div class="demand-book-cover cover-gradient-3">🔮</div>
+                      <div class="demand-meta">
+                        <div class="demand-title">A Sharp Punishment</div>
+                        <div class="demand-author">Devon Lane</div>
+                      </div>
+                    </div>
+                    <span class="demand-percent">8% ↗</span>
+                  </div>
+
+                  <div class="demand-item">
+                    <div class="demand-book-left">
+                      <div class="demand-book-cover cover-gradient-4">🌌</div>
+                      <div class="demand-meta">
+                        <div class="demand-title">Yes, Maybe, No</div>
+                        <div class="demand-author">Eleanor Pena</div>
+                      </div>
+                    </div>
+                    <span class="demand-percent">6% ↗</span>
+                  </div>
+
+                  <div class="demand-item">
+                    <div class="demand-book-left">
+                      <div class="demand-book-cover cover-gradient-5">🌍</div>
+                      <div class="demand-meta">
+                        <div class="demand-title">Invaders of the Earth</div>
+                        <div class="demand-author">Jenny Wilson</div>
+                      </div>
+                    </div>
+                    <span class="demand-percent">9% ↗</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category Distribution Donut Card -->
+              <div class="category-donut-card">
+                <div class="donut-card-header">
+                  <h3>Gender / Categories</h3>
+                  <button class="icon-circle-btn" title="Toggle view">
+                    🎛️
+                  </button>
+                </div>
+
+                <div class="donut-visual-container">
+                  <div class="donut-circle-graphic" title="50% Computer Science, 32.5% Engineering, 17.5% General Sciences"></div>
+                </div>
+
+                <div class="donut-legend-list">
+                  <div class="donut-legend-row">
+                    <div class="donut-label-group">
+                      <span class="dot-indicator dot-lavender"></span>
+                      <span>Women / Computer Science</span>
+                    </div>
+                    <span class="donut-value-text">50%</span>
+                  </div>
+
+                  <div class="donut-legend-row">
+                    <div class="donut-label-group">
+                      <span class="dot-indicator dot-purple"></span>
+                      <span>Men / Engineering</span>
+                    </div>
+                    <span class="donut-value-text">32.5%</span>
+                  </div>
+
+                  <div class="donut-legend-row">
+                    <div class="donut-label-group">
+                      <span class="dot-indicator dot-gold"></span>
+                      <span>Others / General</span>
+                    </div>
+                    <span class="donut-value-text">17.5%</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 2: MOBILE SCANNER & GOOGLE LENS MAPPING
+             ========================================== -->
+        <section class="view-section" id="view-scanner">
+
+          <!-- Mobile Scanner Mode Switcher (Camera vs Book Info Form) -->
+          <div class="scanner-mobile-switcher" id="scannerMobileSwitcher">
+            <button type="button" class="scanner-mode-tab active" data-mode="camera" onclick="window.switchScannerMobileMode('camera')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+              <span>Camera Scanner</span>
+            </button>
+            <button type="button" class="scanner-mode-tab" data-mode="form" onclick="window.switchScannerMobileMode('form')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span>Book Form (27 Fields)</span>
+            </button>
+            <button type="button" class="scanner-mode-tab" data-mode="both" onclick="window.switchScannerMobileMode('both')">
+              <span>View Both</span>
+            </button>
+          </div>
+          
+          <div class="scanner-grid">
+            
+            <!-- Left Side: Camera & Google Lens Interactive Image -->
+            <div id="scannerLeftCol" class="scanner-col-camera">
+              
+              <!-- Camera Mode Viewport -->
+              <div class="camera-box-card" id="cameraViewSection">
+                <div class="camera-viewport-wrap">
+                  <video id="cameraVideo" autoplay playsinline muted></video>
+                  <canvas id="scannerCanvas"></canvas>
+                  
+                  <!-- Framing Guide Overlay for Book Pages -->
+                  <div class="viewfinder-guide-overlay">
+                    <div class="guide-tip-pill">Align book page or title within frame</div>
+                  </div>
+                </div>
+
+                <!-- Camera Controls Toolbar -->
+                <div class="camera-controls-bar">
+                  <button class="camera-sub-btn" id="torchBtn" title="Toggle Flash / Torch">
+                    💡
+                  </button>
+
+                  <button class="camera-shutter-btn" id="shutterBtn" title="Capture Book Page">
+                    <div class="camera-shutter-inner"></div>
+                  </button>
+
+                  <button class="camera-sub-btn" id="switchCamBtn" title="Switch Front/Rear Camera">
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              <!-- Captured Preview + Google Lens Interactive Overlay Mode -->
+              <div class="card" id="capturedViewSection" style="display: none; position: relative;">
+                <div class="card-header">
+                  <h3>
+                    <span>🔍</span> Google Lens-Like Text Selection
+                  </h3>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-sm" id="rescanBtn">
+                      🔄 Re-Scan
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="autoMapBtn">
+                      ✨ Auto-Map Fields
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                    Tap any highlighted word/text box below to assign it directly into your 27 Excel fields!
+                  </p>
+
+                  <!-- Lens Interactive Container -->
+                  <div class="lens-preview-container" id="lensContainer">
+                    <img id="capturedImagePreview" alt="Scanned book preview">
+                    <div class="lens-overlay-layer" id="lensOverlay"></div>
+
+                    <!-- Lens Floating Assign Popover -->
+                    <div class="lens-selection-popover" id="lensPopover">
+                      <div class="lens-popover-text">"Selected Text"</div>
+                      <div class="lens-popover-buttons">
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Title')">📌 Title</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Author 1')">👤 Author 1</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('ISBN')">🏷️ ISBN</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Publisher')">🏢 Publisher</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Year')">📅 Year</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Edition')">📖 Edition</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Call No/DC')">🔢 Call No</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Price')">💰 Price</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Department')">🏛️ Department</button>
+                        <button type="button" class="lens-assign-chip" onclick="window.scannerApp.lensMapper.assignSelectedTextToField('Location')">📍 Location</button>
+                      </div>
+                      <div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.12);">
+                        <select class="lens-all-fields-select" id="lensAllFieldsSelect" onchange="if(this.value){window.scannerApp.lensMapper.assignSelectedTextToField(this.value); this.value='';}">
+                          <option value="">⚙️ Assign to all other fields...</option>
+                          <optgroup label="Core Information">
+                            <option value="Title">Title</option>
+                            <option value="Author 1">Author 1</option>
+                            <option value="Auth 2">Auth 2</option>
+                            <option value="Auth 3">Auth 3</option>
+                            <option value="Auth Type ACEIT">Auth Type ACEIT</option>
+                            <option value="Year">Year</option>
+                            <option value="Edition">Edition</option>
+                            <option value="ISBN">ISBN</option>
+                          </optgroup>
+                          <optgroup label="Publication & Physical">
+                            <option value="Publisher">Publisher</option>
+                            <option value="Publisher Place">Publisher Place</option>
+                            <option value="Price">Price</option>
+                            <option value="Collation">Collation</option>
+                            <option value="Notes CD/Supplementary Book">Notes CD/Supplementary Book</option>
+                          </optgroup>
+                          <optgroup label="Classification & Dept">
+                            <option value="Access No">Access No</option>
+                            <option value="Call No/DC">Call No/DC</option>
+                            <option value="Department">Department</option>
+                            <option value="Department Code">Department Code</option>
+                            <option value="Section">Section</option>
+                            <option value="Section Code">Section Code</option>
+                            <option value="Subject-Code">Subject-Code</option>
+                            <option value="Date of Entry">Date of Entry</option>
+                          </optgroup>
+                          <optgroup label="Inventory & Transfer">
+                            <option value="Fund Code">Fund Code</option>
+                            <option value="Dept Transfer No">Dept Transfer No</option>
+                            <option value="Transfer Status (Internal/External)">Transfer Status</option>
+                            <option value="Serial No">Serial No</option>
+                            <option value="Location">Location</option>
+                            <option value="Keyword (650 -e relator term)">Keyword</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Extracted Word Chips -->
+                  <div style="margin-top: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">
+                        Recognized Text Tokens (Tap to assign):
+                      </span>
+                      <button class="btn btn-secondary btn-sm" id="copyOcrTextBtn" style="padding: 3px 8px; font-size: 11px;">
+                        Copy Raw Text
+                      </button>
+                    </div>
+                    <div class="extracted-chips-container" id="extractedChipsContainer"></div>
+                  </div>
+
+                  <!-- Raw OCR Output Accordion/Box -->
+                  <details style="margin-top: 14px;">
+                    <summary style="font-size: 12px; color: var(--text-muted); cursor: pointer; font-weight: 600;">
+                      View Full Extracted OCR Text
+                    </summary>
+                    <div class="extracted-text-box" id="extractedTextOutput" style="margin-top: 8px;"></div>
+                  </details>
+                </div>
+              </div>
+
+              <!-- Upload File Alternative Card -->
+              <div class="card" style="margin-top: 16px;">
+                <div class="card-body" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <strong style="font-size: 14px; color: var(--primary-navy);">Have a photo or scanned file?</strong>
+                    <p style="font-size: 12px; color: var(--text-muted);">Upload directly from camera roll or computer</p>
+                  </div>
+                  <div>
+                    <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin-bottom: 0;">
+                      📁 Upload Image
+                      <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Jump to Form on Mobile -->
+              <div class="scanner-jump-bar" id="scannerJumpBar">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.switchScannerMobileMode('form')" style="width: 100%; justify-content: center; gap: 8px; font-weight: 700; border-color: var(--primary-purple); color: var(--primary-purple); padding: 10px;">
+                  <span>📝 Fill / Review Book Details (27 Fields) →</span>
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Right Side: 27 Excel Fields Structured Form -->
+            <div id="scannerRightCol" class="scanner-col-form">
+              <div class="card">
+                <div class="card-header">
+                  <h3>
+                    <span>📝</span> Book Information (27 Columns)
+                  </h3>
+                  <span id="editingIndicator" class="badge-tag tag-amber" style="display: none;">
+                    Editing Existing
+                  </span>
+                </div>
+
+                <div class="card-body">
+
+                  <!-- Quick Back to Camera on Mobile -->
+                  <div class="scanner-back-camera-bar" id="scannerBackCameraBar">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.switchScannerMobileMode('camera')" style="gap: 6px; margin-bottom: 14px; font-weight: 600;">
+                      ← Back to Camera Viewfinder
+                    </button>
+                  </div>
+
+                  <form id="bookDetailsForm">
+
+                    <!-- Tabbed Categorization for 27 Fields -->
+                    <div class="form-section-tabs">
+                      <button type="button" class="form-tab-btn active" data-target="tab-core">
+                        Core Info
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-pub">
+                        Publication
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-dept">
+                        Classification
+                      </button>
+                      <button type="button" class="form-tab-btn" data-target="tab-extra">
+                        Notes & Extra
+                      </button>
+                    </div>
+
+                    <!-- TAB 1: Core Bibliographic Fields -->
+                    <div class="form-tab-pane active" id="tab-core">
+                      <div class="form-group">
+                        <label class="form-label">Title <span class="required">*</span></label>
+                        <input type="text" id="field_title" class="form-control" placeholder="Book Title" required>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Author 1</label>
+                          <input type="text" id="field_author_1" class="form-control" placeholder="Primary Author">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">ISBN</label>
+                          <input type="text" id="field_isbn" class="form-control" placeholder="978-X-XX-XXXXXX-X">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Auth 2</label>
+                          <input type="text" id="field_auth_2" class="form-control" placeholder="Second Author">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Auth 3</label>
+                          <input type="text" id="field_auth_3" class="form-control" placeholder="Third Author">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Year</label>
+                          <input type="number" id="field_year" class="form-control" placeholder="e.g. 2024">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Edition</label>
+                          <input type="text" id="field_edition" class="form-control" placeholder="e.g. 3rd Edition">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label">Auth Type ACEIT</label>
+                        <input type="text" id="field_auth_type_aceit" class="form-control" placeholder="e.g. Faculty / Donor / Standard">
+                      </div>
+                    </div>
+
+                    <!-- TAB 2: Publication & Physical -->
+                    <div class="form-tab-pane" id="tab-pub">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Publisher</label>
+                          <input type="text" id="field_publisher" class="form-control" placeholder="e.g. Academic Press">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Publisher Place</label>
+                          <input type="text" id="field_publisher_place" class="form-control" placeholder="e.g. Cambridge, MA">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Price</label>
+                          <input type="number" step="0.01" id="field_price" class="form-control" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Collation</label>
+                          <input type="text" id="field_collation" class="form-control" placeholder="e.g. xvi, 524 p. : ill. ; 24 cm">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label">Notes CD/Supplementary Book</label>
+                        <textarea id="field_notes_cd_supplementary_book" class="form-control" rows="2" placeholder="Companion CD, lab manual or digital access notes"></textarea>
+                      </div>
+                    </div>
+
+                    <!-- TAB 3: Classification & Department -->
+                    <div class="form-tab-pane" id="tab-dept">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Access No</label>
+                          <input type="text" id="field_access_no" class="form-control" placeholder="e.g. ACC-0001">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Call No/DC</label>
+                          <input type="text" id="field_call_no_dc" class="form-control" placeholder="e.g. 005.133 PY">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Department</label>
+                          <input type="text" id="field_department" class="form-control" placeholder="e.g. Computer Science & Engineering">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Department Code</label>
+                          <input type="text" id="field_department_code" class="form-control" placeholder="e.g. CSE">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Section</label>
+                          <input type="text" id="field_section" class="form-control" placeholder="e.g. Reference Section">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Section Code</label>
+                          <input type="text" id="field_section_code" class="form-control" placeholder="e.g. REF">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Subject-Code</label>
+                          <input type="text" id="field_subject_code" class="form-control" placeholder="e.g. CS-DS-01">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Date of Entry</label>
+                          <input type="date" id="field_date_of_entry" class="form-control">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- TAB 4: Extra Inventory & Transfer -->
+                    <div class="form-tab-pane" id="tab-extra">
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Fund Code</label>
+                          <input type="text" id="field_fund_code" class="form-control" placeholder="e.g. FC-LIB-2024">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Dept Transfer No</label>
+                          <input type="text" id="field_dept_transfer_no" class="form-control" placeholder="e.g. TR-0891">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Transfer Status</label>
+                          <select id="field_transfer_status" class="form-control">
+                            <option value="Internal">Internal</option>
+                            <option value="External">External</option>
+                          </select>
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Serial No</label>
+                          <input type="text" id="field_serial_no" class="form-control" placeholder="e.g. SN-2026-001">
+                        </div>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Location</label>
+                          <input type="text" id="field_location" class="form-control" placeholder="e.g. Shelf A-14, Tier 2">
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Keyword (650 -e relator term)</label>
+                          <input type="text" id="field_keyword" class="form-control" placeholder="e.g. Data science, Python">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Form Action Buttons -->
+                    <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
+                      <button type="submit" class="btn btn-primary" style="flex: 2;">
+                        💾 Save to Database
+                      </button>
+                      <button type="button" class="btn btn-navy" id="saveAndNextBtn" style="flex: 2;">
+                        ⏩ Save & Scan Next
+                      </button>
+                      <button type="button" class="btn btn-secondary" id="clearFormBtn" style="flex: 1;">
+                        Clear
+                      </button>
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- OCR Progress Overlay (Visible during Tesseract recognition) -->
+          <div class="ocr-progress-overlay" id="ocrProgressOverlay">
+            <div class="ocr-spinner"></div>
+            <h3 style="font-size: 18px; margin-bottom: 6px;">Extracting Text from Book Page</h3>
+            <p id="ocrProgressText" style="font-size: 13px; color: #94a3b8;">Processing high-resolution OCR...</p>
+            <div class="ocr-progress-bar-wrap">
+              <div class="ocr-progress-fill" id="ocrProgressBar"></div>
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 3: BOOK MANAGEMENT (CRUD TABLE)
+             ========================================== -->
+        <section class="view-section" id="view-books">
+          
+          <div class="card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 260px;">
+                <input type="text" id="bookSearchInput" class="form-control" placeholder="Search by Title, Author, ISBN, Publisher, Call No...">
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-primary btn-sm" data-action="navigate" data-target="scanner" onclick="window.switchView('scanner')">
+                  + Add / Scan Book
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="window.booksManager.exportFilteredBooks()" title="Export current search / filtered view to Excel">
+                  📄 Export Filtered (.xlsx)
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('exportAllBooksBtn').click()" title="Export entire database to Excel">
+                  📊 Export All (.xlsx)
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Options Toolbar -->
+            <div style="display: flex; gap: 10px; padding: 10px 20px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                Filter:
+              </span>
+              <select id="filterDepartment" class="form-control" style="width: auto; min-width: 180px; font-size: 13px; padding: 6px 10px;">
+                <option value="">🏛️ All Departments</option>
+              </select>
+              <select id="filterStatus" class="form-control" style="width: auto; min-width: 130px; font-size: 13px; padding: 6px 10px;">
+                <option value="">All Statuses</option>
+                <option value="verified">Verified</option>
+                <option value="pending">Pending</option>
+              </select>
+              <select id="filterSource" class="form-control" style="width: auto; min-width: 130px; font-size: 13px; padding: 6px 10px;">
+                <option value="">All Sources</option>
+                <option value="scanned">Scanned</option>
+                <option value="imported">Imported</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" id="clearFiltersBtn" style="padding: 5px 12px; font-size: 12px;">
+                ✕ Clear Filters
+              </button>
+              <span id="filterStatsCount" style="font-size: 12px; color: var(--text-muted); margin-left: auto; font-weight: 600;"></span>
+            </div>
+
+            <!-- Selected items floating action bar -->
+            <div id="selectedItemsToolbar" style="display: none; background: #0f172a; color: white; padding: 10px 20px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span id="selectedCountBadge" style="font-weight: 600; font-size: 13px; color: #38bdf8;">0 selected</span>
+                <button class="btn btn-sm" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 11px; padding: 3px 8px;" onclick="window.booksManager.selectAllFiltered()">
+                  Select All Filtered
+                </button>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-primary btn-sm" onclick="window.booksManager.exportSelectedBooks()">
+                  📊 Export Selected (.xlsx)
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="window.booksManager.markSelectedAsVerified()">
+                  ✓ Mark Verified
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="window.booksManager.deleteSelectedBooks()">
+                  🗑️ Delete Selected
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="window.booksManager.deselectAll()">
+                  ✕ Deselect
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">
+                        <input type="checkbox" id="selectAllBooks">
+                      </th>
+                      <th>Access No</th>
+                      <th>Title & Author</th>
+                      <th>ISBN</th>
+                      <th>Publisher</th>
+                      <th>Year</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="booksTableBody">
+                    <!-- Populated dynamically by books.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card-body" id="booksPagination" style="border-top: 1px solid var(--border-color); padding: 14px 24px;">
+              <!-- Pagination controls populated dynamically -->
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 4: EXCEL IMPORT
+             ========================================== -->
+        <section class="view-section" id="view-import">
+          
+          <div class="card">
+            <div class="card-header">
+              <h3><span>📥</span> Import Existing Excel Workbook (Sheet1)</h3>
+              <button class="btn btn-secondary btn-sm" id="downloadTemplateBtn2" onclick="document.getElementById('downloadTemplateBtn').click()">
+                Download 27-Column Template
+              </button>
+            </div>
+            
+            <div class="card-body">
+              <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">
+                Upload your <code>Donated book list 2026 Nov(1).xlsx</code> file directly. The system automatically detects all 27 column headers, checks for duplicate ISBN / Access numbers, and stores records into Supabase PostgreSQL.
+              </p>
+
+              <!-- Drag and Drop Zone -->
+              <div id="excelDropZone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-lg); padding: 50px 20px; text-align: center; cursor: pointer; transition: var(--transition); background: var(--bg-subtle);">
+                <div style="font-size: 48px; margin-bottom: 12px;">📊</div>
+                <h4 style="font-size: 16px; font-weight: 700; color: var(--primary-navy); margin-bottom: 6px;">
+                  Drag and drop your Excel file here, or click to browse
+                </h4>
+                <p style="font-size: 13px; color: var(--text-muted);">
+                  Supports .xlsx and .xls workbooks matching the 27 column template
+                </p>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+              </div>
+
+              <!-- Import Preview Section -->
+              <div id="importPreviewSection" style="display: none; margin-top: 28px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <h4 style="font-size: 16px; font-weight: 700; color: var(--primary-navy);">
+                      Import Preview: <span id="importTotalCount">0</span> rows detected
+                    </h4>
+                    <p style="font-size: 12px; color: var(--text-muted);">
+                      <span id="importDupCount">0</span> potential duplicate records flagged.
+                    </p>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 16px;">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                      <input type="checkbox" id="skipDuplicatesCheck" checked>
+                      Skip Duplicates
+                    </label>
+
+                    <button class="btn btn-primary" id="commitImportBtn">
+                      Confirm & Import Records
+                    </button>
+                  </div>
+                </div>
+
+                <div class="table-responsive" style="border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: 380px; overflow-y: auto;">
+                  <table class="modern-table">
+                    <thead>
+                      <tr>
+                        <th>Access No</th>
+                        <th>Title</th>
+                        <th>Author 1</th>
+                        <th>ISBN</th>
+                        <th>Publisher</th>
+                        <th>Year</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="importPreviewTableBody">
+                      <!-- Filled dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </section>
+
+
+        <!-- ==========================================
+             VIEW 5: SETTINGS & SUPABASE CONFIG
+             ========================================== -->
+        <section class="view-section" id="view-settings">
+          
+          <div class="card">
+            <div class="card-header">
+              <h3><span>⚙️</span> Supabase Database & Storage Configuration</h3>
+            </div>
+            
+            <div class="card-body">
+              <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">
+                Connect your Supabase project to enable cloud synchronization, PostgreSQL persistence across all devices, and image storage in the <code>book-scans</code> bucket.
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input type="text" id="supabaseUrlInput" class="form-control" placeholder="https://xyzcompany.supabase.co">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Anon Public Key</label>
+                <input type="password" id="supabaseKeyInput" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                <small style="color: var(--text-muted); font-size: 12px;">
+                  Use the <code>anon public</code> key. Never provide your service_role secret key in the frontend client.
+                </small>
+              </div>
+
+              <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center;">
+                <button type="button" class="btn btn-primary" id="saveSupabaseSettingsBtn">
+                  Save Credentials
+                </button>
+                <button type="button" class="btn btn-secondary" id="testSupabaseConnectionBtn">
+                  Test Connection
+                </button>
+                <button type="button" class="btn btn-navy" id="copySchemaSqlBtn">
+                  📋 Copy Schema SQL
+                </button>
+                <button type="button" class="btn btn-danger" id="removeSampleDataBtn" style="font-weight: 700;">
+                  🗑️ Remove Sample Data
+                </button>
+                <button type="button" class="btn btn-navy" id="copyRemoveSqlBtn">
+                  📋 Copy Clean SQL
+                </button>
+              </div>
+
+              <!-- Connection Feedback Box -->
+              <div id="supabaseStatusFeedback" style="display: none; margin-top: 16px; padding: 14px 18px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.5;"></div>
+
+              <!-- SQL Setup Tip Box -->
+              <div style="margin-top: 20px; padding: 14px 18px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <strong style="color: var(--primary-navy); font-size: 13px;">💡 Cloud Sync Status:</strong>
+                <ol style="margin: 8px 0 0 18px; font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+                  <li>Connected to Supabase PostgreSQL database.</li>
+                  <li><strong>Only your entered data</strong> (scanned or imported books) is displayed.</li>
+                  <li>Click <strong>🗑️ Remove Sample Data</strong> above to purge any lingering demo records.</li>
+                  <li>All your new scanned and entered books will sync directly to your live Supabase database!</li>
+                </ol>
+              </div>
+
+              <hr style="margin: 32px 0; border: none; border-top: 1px solid var(--border-color);">
+
+              <h4 style="font-size: 15px; font-weight: 700; color: var(--primary-navy); margin-bottom: 12px;">
+                Local Storage & Demo Data Maintenance
+              </h4>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                Manage offline browser cache and sample academic records.
+              </p>
+              
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-warning btn-sm" id="resetSampleDataBtn" style="font-weight: 600;">
+                  🧹 Purge Sample Demo Books
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="clearLocalDataBtn">
+                  🗑️ Clear Local Cache
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- Mobile Bottom Navigation Bar (Crisp Vector Icons) -->
+  <nav class="mobile-bottom-nav">
+    <a class="mobile-nav-item active" data-route="dashboard" href="#dashboard" onclick="window.switchView('dashboard')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bottom-nav-icon"><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg>
+      <span>Dashboard</span>
+    </a>
+    <a class="mobile-nav-item scan-primary" data-route="scanner" href="#scanner" onclick="window.switchView('scanner')">
+      <div class="scan-circle-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+      </div>
+      <span>Scan</span>
+    </a>
+    <a class="mobile-nav-item" data-route="books" href="#books" onclick="window.switchView('books')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bottom-nav-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      <span>Records</span>
+    </a>
+    <a class="mobile-nav-item" data-route="import" href="#import" onclick="window.switchView('import')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bottom-nav-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+      <span>Import</span>
+    </a>
+    <a class="mobile-nav-item" data-route="settings" href="#settings" onclick="window.switchView('settings')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bottom-nav-icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+
+  <!-- Full 27-Column Book Details Modal -->
+  <div class="modal-overlay" id="bookDetailsModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>Complete Book Catalog Profile</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="bookDetailsModalContent">
+        <!-- Rendered dynamically by books.js -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Application Bundle (Works seamlessly over both file:/// and http:// protocols) -->
+  <script src="assets/js/bundle.js"></script>
+
+  <!-- ES Module entry point fallback if supported -->
+  <script type="module">
+    if (!window.app) {
+      import('./assets/js/app.js').catch(function(e) { console.warn('Module fallback:', e); });
+    }
+  </script>
+
+</body>
+</html>

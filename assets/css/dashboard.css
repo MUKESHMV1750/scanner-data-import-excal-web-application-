@@ -1,0 +1,653 @@
+/* ==============================================================================
+   Dashboard.css - Reference UI Design (Dual Bar Chart, Demands, Category Donut)
+   Inspired by Reference UI: Lavender, Cream, Deep Purple, Gold, Light Grey Cards
+   ============================================================================== */
+
+/* Main 2-Column Split Layout */
+.dashboard-reference-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-reference-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.dashboard-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* ==============================================================================
+   1. Circulation & Revenue Analytics Card with Dual Bar Chart
+   ============================================================================== */
+.analytics-hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analytics-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.analytics-title-group h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  letter-spacing: -0.3px;
+}
+
+.analytics-subtitle-dropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.analytics-subtitle-dropdown:hover {
+  color: var(--primary-purple);
+}
+
+.analytics-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pill-select-btn {
+  background: var(--bg-card-inner, #FFFFFF);
+  border: 1px solid var(--border-color);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.pill-select-btn:hover {
+  border-color: var(--primary-purple);
+}
+
+/* Revenue / Metric Highlight & Chart Legend */
+.analytics-metric-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.analytics-big-number {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.chart-legend-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot-lavender {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #DDB9E8;
+}
+
+.legend-dot-gold {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #F59E0B;
+}
+
+/* Dual Color Bar Chart Graphic */
+.dual-bar-chart-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 160px;
+  padding-top: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.chart-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding-right: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9CA3AF;
+  text-align: right;
+  min-width: 28px;
+  user-select: none;
+}
+
+.chart-bars-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  gap: 8px;
+}
+
+.chart-month-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chart-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 100%;
+  width: 100%;
+  justify-content: center;
+}
+
+.bar-pill {
+  width: 8px;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease, opacity 0.2s;
+  cursor: pointer;
+  position: relative;
+}
+
+.bar-pill:hover {
+  opacity: 0.85;
+  transform: scaleY(1.04);
+}
+
+.bar-lavender {
+  background: #E8D3F3;
+}
+
+.bar-lavender.active-accent {
+  background: #C47EDB;
+}
+
+.bar-gold {
+  background: #F59E0B;
+}
+
+.month-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9CA3AF;
+  text-align: center;
+}
+
+/* Bottom Stats Row inside Analytics Card */
+.analytics-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .analytics-stats-strip {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.stat-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card-inner, #FFFFFF);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.stat-tile:hover {
+  border-color: var(--primary-purple);
+  transform: translateY(-1px);
+}
+
+.stat-tile-left span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.stat-tile-left h4 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-tile-trend {
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+}
+
+.stat-tile-trend.up {
+  color: var(--color-success);
+  background: rgba(22, 160, 133, 0.1);
+}
+
+.stat-tile-trend.down {
+  color: #E74C3C;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.stat-tile-trend.neutral {
+  color: var(--primary-purple);
+  background: var(--accent-purple-soft);
+}
+
+.stat-arrow-icon {
+  font-size: 14px;
+  color: #9CA3AF;
+}
+
+/* ==============================================================================
+   2. "Books Circulated" Recent Books Table Card
+   ============================================================================== */
+.circulated-books-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.circulated-card-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+}
+
+.circulated-card-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.circulated-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.circulated-table th {
+  padding: 12px 24px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #9CA3AF;
+  text-align: left;
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.circulated-table td {
+  padding: 14px 24px;
+  color: var(--text-primary);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.circulated-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.circulated-table tbody tr:hover {
+  background-color: var(--table-hover-bg, #FFFFFF);
+}
+
+.member-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.member-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.book-title-text {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-return-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ==============================================================================
+   3. Right Column: "Demands" Trending Books Card
+   ============================================================================== */
+.demands-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.demands-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.demands-card-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.icon-circle-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-card-inner, #FFFFFF);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.icon-circle-btn:hover {
+  color: var(--primary-purple);
+  border-color: var(--primary-purple);
+}
+
+.demands-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.demand-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  transition: var(--transition);
+}
+
+.demand-book-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.demand-book-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.cover-gradient-1 {
+  background: linear-gradient(135deg, #FF7E5F, #FEB47B);
+}
+
+.cover-gradient-2 {
+  background: linear-gradient(135deg, #1A1A2E, #16213E, #0F3460);
+}
+
+.cover-gradient-3 {
+  background: linear-gradient(135deg, #7F00FF, #E100FF);
+}
+
+.cover-gradient-4 {
+  background: linear-gradient(135deg, #2C3E50, #4CA1AF);
+}
+
+.cover-gradient-5 {
+  background: linear-gradient(135deg, #11998E, #38EF7D);
+}
+
+.demand-meta {
+  min-width: 0;
+}
+
+.demand-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.demand-author {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.demand-percent {
+  font-size: 12px;
+  font-weight: 700;
+  color: #16A085;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+/* ==============================================================================
+   4. Right Column: "Category Distribution" Donut Chart Card
+   ============================================================================== */
+.category-donut-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.donut-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.donut-card-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.donut-visual-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* Conic Gradient Donut Pie matching reference:
+   Soft Lavender (50%), Deep Purple (32.5%), Warm Gold (17.5%) */
+.donut-circle-graphic {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #DDB9E8 0% 50%,
+    #581568 50% 82.5%,
+    #F59E0B 82.5% 100%
+  );
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(88, 21, 104, 0.08);
+}
+
+.donut-circle-graphic::after {
+  content: "";
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  position: absolute;
+}
+
+.donut-legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.donut-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.donut-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dot-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-lavender {
+  background-color: #DDB9E8;
+}
+
+.dot-purple {
+  background-color: #581568;
+}
+
+.dot-gold {
+  background-color: #F59E0B;
+}
+
+.donut-value-text {
+  font-weight: 700;
+  color: var(--text-primary);
+}
