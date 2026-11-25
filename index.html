@@ -698,6 +698,29 @@
             </button>
           </div>
           
+          <!-- Scanner Control Bar: Recognition Model Selecting & Photo Import -->
+          <div class="scanner-toolbar-card" id="scannerModelToolbar">
+            <div class="model-selector-group">
+              <span style="font-size: 13px; font-weight: 700; color: var(--primary-navy); display: flex; align-items: center; gap: 6px;">
+                <span>🧠</span> Recognition Model:
+              </span>
+              <select id="ocrModelSelector" class="form-control" style="width: auto; min-width: 270px; font-size: 13px; font-weight: 600; padding: 7px 12px; border-color: var(--primary-purple); background: var(--bg-subtle);">
+                <option value="academic" selected>📚 Academic Textbook & Cover Model (Recommended)</option>
+                <option value="fast">⚡ Fast OCR Text Extraction Model</option>
+                <option value="dense">🎯 Dense Front-Matter / Cataloging Model</option>
+              </select>
+              <span class="model-selector-badge">Live Auto-Map</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" id="toolbarImportImageBtn" onclick="document.getElementById('imageUploadInput').click()" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span>📁</span> Import Book Photo
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" id="toolbarAutoMapBtn" onclick="if(window.scannerApp){window.scannerApp.runAutoMapping();}" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span>✨</span> Auto-Map All Fields
+              </button>
+            </div>
+          </div>
+          
           <div class="scanner-grid">
             
             <!-- Left Side: Camera & Google Lens Interactive Image -->
@@ -737,19 +760,23 @@
                   <h3>
                     <span>🔍</span> Google Lens-Like Text Selection
                   </h3>
-                  <div style="display: flex; gap: 8px;">
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button class="btn btn-secondary btn-sm" id="rescanBtn">
                       🔄 Re-Scan
                     </button>
                     <button class="btn btn-primary btn-sm" id="autoMapBtn">
                       ✨ Auto-Map Fields
                     </button>
+                    <button type="button" class="btn btn-navy btn-sm" id="openSelectImportBtn" onclick="if(window.scannerApp && window.scannerApp.lensMapper){window.scannerApp.lensMapper.openImportModal(window.scannerApp.currentOcrResult ? window.scannerApp.currentOcrResult.text.split('\n')[0] : '');}" style="font-weight: 700;">
+                      🎯 Select & Import
+                    </button>
                   </div>
                 </div>
 
                 <div class="card-body">
-                  <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-                    Tap any highlighted word/text box below to assign it directly into your 27 Excel fields!
+                  <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                    <span>💡 Tap any highlighted phrase box or drag across the image to select text, then import directly into any field!</span>
+                    <span style="font-size: 11px; background: rgba(88,21,104,0.1); color: var(--primary-purple); padding: 2px 8px; border-radius: 4px; font-weight: 600;">Drag / Tap to Select</span>
                   </p>
 
                   <!-- Lens Interactive Container -->
@@ -1220,6 +1247,25 @@
                 Upload your <code>Donated book list 2026 Nov(1).xlsx</code> file directly. The system automatically detects all 27 column headers, checks for duplicate ISBN / Access numbers, and stores records into Supabase PostgreSQL.
               </p>
 
+              <!-- Import Model & Mapping Strategy Options -->
+              <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; font-weight: 700; color: var(--primary-navy);">
+                    <span>⚙️</span> Import Model:
+                  </span>
+                  <select id="excelImportModelSelect" class="form-control" style="width: auto; min-width: 290px; font-size: 13px; font-weight: 600; padding: 7px 12px; background: var(--bg-subtle);">
+                    <option value="strict" selected>📋 Standard 27-Column Exact Template Match</option>
+                    <option value="smart">🧠 Smart Fuzzy Column Auto-Mapping (Any Excel Sheet)</option>
+                    <option value="upsert">🔄 Sync & Update Existing Books (By Access No)</option>
+                  </select>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                  <span>✓ Duplicate check active</span>
+                  <span>•</span>
+                  <span>✓ Supabase cloud sync ready</span>
+                </div>
+              </div>
+
               <!-- Drag and Drop Zone -->
               <div id="excelDropZone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-lg); padding: 50px 20px; text-align: center; cursor: pointer; transition: var(--transition); background: var(--bg-subtle);">
                 <div style="font-size: 48px; margin-bottom: 12px;">📊</div>
@@ -1400,6 +1446,97 @@
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
+
+
+  <!-- ========================================================
+       Select Field & Import Modal (Interactive OCR Text Mapping)
+       ======================================================== -->
+  <div class="modal-overlay" id="textImportModal">
+    <div class="modal-container" style="max-width: 520px; border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-header" style="background: linear-gradient(135deg, var(--primary-purple), var(--primary-hover)); color: #FFFFFF; padding: 16px 20px;">
+        <h3 style="color: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 16px; margin: 0;">
+          <span>🎯</span> Select Field & Import
+        </h3>
+        <button class="modal-close-btn" style="color: #FFFFFF; opacity: 0.9; font-size: 22px;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px;">
+        <div style="margin-bottom: 16px;">
+          <label class="form-label" style="font-weight: 700; color: var(--primary-navy); margin-bottom: 6px; display: block;">
+            Selected Text (Editable):
+          </label>
+          <textarea id="importModalSelectedText" class="form-control" rows="2" style="font-size: 15px; font-weight: 600; color: var(--primary-purple); background: var(--bg-subtle); border: 1.5px solid #DDB9E8;"></textarea>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label class="form-label" style="font-weight: 700; color: var(--primary-navy); margin-bottom: 6px; display: block;">
+            Select Target Field (27 Excel Columns):
+          </label>
+          <select id="importModalTargetField" class="form-control" style="font-size: 14px; font-weight: 600; padding: 9px 12px; border: 1.5px solid var(--border-color);">
+            <optgroup label="Core Information">
+              <option value="Title" selected>📌 Title</option>
+              <option value="Author 1">👤 Author 1</option>
+              <option value="Auth 2">👤 Auth 2</option>
+              <option value="Auth 3">👤 Auth 3</option>
+              <option value="Auth Type ACEIT">👤 Auth Type ACEIT</option>
+              <option value="Year">📅 Year</option>
+              <option value="Edition">📖 Edition</option>
+              <option value="ISBN">🏷️ ISBN</option>
+            </optgroup>
+            <optgroup label="Publication & Physical">
+              <option value="Publisher">🏢 Publisher</option>
+              <option value="Publisher Place">📍 Publisher Place</option>
+              <option value="Price">💰 Price</option>
+              <option value="Collation">📏 Collation</option>
+              <option value="Notes CD/Supplementary Book">💿 Notes CD / Book</option>
+            </optgroup>
+            <optgroup label="Classification & Department">
+              <option value="Department">🏛️ Department</option>
+              <option value="Department Code">🏛️ Department Code</option>
+              <option value="Access No">🔢 Access No</option>
+              <option value="Call No/DC">🔢 Call No / DC</option>
+              <option value="Section">📁 Section</option>
+              <option value="Section Code">📁 Section Code</option>
+              <option value="Subject-Code">📚 Subject Code</option>
+              <option value="Date of Entry">📅 Date of Entry</option>
+            </optgroup>
+            <optgroup label="Inventory & Transfer">
+              <option value="Fund Code">💼 Fund Code</option>
+              <option value="Dept Transfer No">🔄 Dept Transfer No</option>
+              <option value="Transfer Status (Internal/External)">🔄 Transfer Status</option>
+              <option value="Serial No">🔢 Serial No</option>
+              <option value="Location">📍 Shelf Location</option>
+              <option value="Keyword (650 -e relator term)">🏷️ Keyword</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <label class="form-label" style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block;">
+            Quick 1-Click Target:
+          </label>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Title'">📌 Title</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Author 1'">👤 Author 1</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Publisher'">🏢 Publisher</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Department'">🏛️ Department</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='ISBN'">🏷️ ISBN</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Year'">📅 Year</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Edition'">📖 Edition</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Price'">💰 Price</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;" onclick="document.getElementById('importModalTargetField').value='Call No/DC'">🔢 Call No</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 14px 20px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary modal-close-btn" style="padding: 8px 16px;">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmTextImportBtn" style="font-weight: 700; padding: 8px 22px; display: flex; align-items: center; gap: 6px;">
+          <span>📥</span> Import into Form
+        </button>
+      </div>
+    </div>
+  </div>
 
 
   <!-- Full 27-Column Book Details Modal -->

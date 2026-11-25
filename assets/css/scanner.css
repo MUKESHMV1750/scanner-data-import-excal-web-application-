@@ -254,8 +254,8 @@
 /* Bounding box word tokens over scanned book image */
 .lens-word-token {
   position: absolute;
-  background: rgba(88, 21, 104, 0.22);
-  border: 1px solid rgba(88, 21, 104, 0.65);
+  background: rgba(88, 21, 104, 0.18);
+  border: 1px solid rgba(88, 21, 104, 0.6);
   border-radius: 3px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -268,6 +268,134 @@
   border: 1.5px solid #ffffff;
   box-shadow: 0 0 10px rgba(88, 21, 104, 0.8);
   transform: scale(1.04);
+}
+
+/* Line / phrase level bounding boxes (inspired by user reference image) */
+.lens-line-box {
+  position: absolute;
+  background: rgba(221, 185, 232, 0.22);
+  border: 2px solid rgba(88, 21, 104, 0.7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  z-index: 12;
+  box-sizing: border-box;
+}
+
+.lens-line-box:hover {
+  background: rgba(221, 185, 232, 0.42);
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 12px rgba(88, 21, 104, 0.4);
+}
+
+.lens-line-box.active {
+  background: rgba(88, 21, 104, 0.32);
+  border: 2.5px solid #581568;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 18px rgba(88, 21, 104, 0.6);
+  z-index: 25;
+}
+
+/* Blue circular drag/selection pins (matching user uploaded book image) */
+.lens-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background-color: #2563EB;
+  border: 2.5px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 30;
+  transition: transform 0.15s ease;
+}
+
+.lens-handle.top-left {
+  top: -7px;
+  left: -7px;
+}
+
+.lens-handle.top-right {
+  top: -7px;
+  right: -7px;
+}
+
+.lens-handle.bottom-left {
+  bottom: -7px;
+  left: -7px;
+}
+
+.lens-handle.bottom-right {
+  bottom: -7px;
+  right: -7px;
+}
+
+/* Drag to select marquee */
+.lens-drag-marquee {
+  position: absolute;
+  border: 2px dashed #581568;
+  background: rgba(221, 185, 232, 0.28);
+  pointer-events: none;
+  z-index: 28;
+  border-radius: 4px;
+}
+
+/* Model Selecting & Import Toolbar */
+.scanner-toolbar-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.scanner-toolbar-card:hover {
+  border-color: #DDB9E8;
+}
+
+.model-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.model-selector-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(88, 21, 104, 0.1);
+  color: var(--primary-purple);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Field import highlight animation */
+@keyframes fieldImportPulse {
+  0% {
+    background-color: rgba(22, 160, 133, 0.35);
+    box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.4);
+    transform: scale(1.02);
+  }
+  50% {
+    background-color: rgba(221, 185, 232, 0.45);
+    box-shadow: 0 0 0 4px rgba(88, 21, 104, 0.3);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.field-imported-highlight {
+  animation: fieldImportPulse 1.4s ease-out;
 }
 
 /* Lens Floating Action Menu */

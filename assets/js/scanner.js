@@ -86,6 +86,18 @@ export class ScannerController {
       autoMapBtn.addEventListener('click', () => this.runAutoMapping());
     }
 
+    // Recognition Model Selector
+    const modelSelector = document.getElementById('ocrModelSelector');
+    if (modelSelector) {
+      modelSelector.addEventListener('change', (e) => {
+        const modelName = e.target.options[e.target.selectedIndex].text;
+        window.app.showToast(`Recognition Model: ${modelName}`, 'info');
+        if (this.currentOcrResult && this.currentOcrResult.text) {
+          this.runAutoMapping();
+        }
+      });
+    }
+
     // Save Book Form Submission
     const bookForm = document.getElementById('bookDetailsForm');
     if (bookForm) {

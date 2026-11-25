@@ -680,10 +680,175 @@ class GoogleLensMapper {
     this.overlay = overlayElement;
     this.popover = popoverElement;
     this.currentWords = [];
+    this.currentLines = [];
     this.selectedWords = [];
     this.onFieldAssignedCallback = null;
+    this.isDragging = false;
+    this.dragStart = { x: 0, y: 0 };
+    this.currentMarquee = null;
 
     this.initPopover();
+    this.initDragToSelect();
+  }
+
+  initDragToSelect() {
+    if (!this.overlay) return;
+
+    const startDrag = (clientX, clientY) => {
+      const rect = this.overlay.getBoundingClientRect();
+      this.isDragging = true;
+      this.dragStart = {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+
+      if (!this.currentMarquee) {
+        this.currentMarquee = document.createElement('div');
+        this.currentMarquee.className = 'lens-drag-marquee';
+        this.overlay.appendChild(this.currentMarquee);
+      }
+      this.currentMarquee.style.left = `${this.dragStart.x}px`;
+      this.currentMarquee.style.top = `${this.dragStart.y}px`;
+      this.currentMarquee.style.width = '0px';
+      this.currentMarquee.style.height = '0px';
+      this.currentMarquee.style.display = 'block';
+    };
+
+    const moveDrag = (clientX, clientY) => {
+      if (!this.isDragging || !this.currentMarquee) return;
+      const rect = this.overlay.getBoundingClientRect();
+      const currentX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const currentY = Math.max(0, Math.min(rect.height, clientY - rect.top));
+
+      const left = Math.min(this.dragStart.x, currentX);
+      const top = Math.min(this.dragStart.y, currentY);
+      const width = Math.abs(currentX - this.dragStart.x);
+      const height = Math.abs(currentY - this.dragStart.y);
+
+      this.currentMarquee.style.left = `${left}px`;
+      this.currentMarquee.style.top = `${top}px`;
+      this.currentMarquee.style.width = `${width}px`;
+      this.currentMarquee.style.height = `${height}px`;
+    };
+
+    const endDrag = () => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+      if (!this.currentMarquee) return;
+
+      const mRect = {
+        left: parseFloat(this.currentMarquee.style.left) || 0,
+        top: parseFloat(this.currentMarquee.style.top) || 0,
+        width: parseFloat(this.currentMarquee.style.width) || 0,
+        height: parseFloat(this.currentMarquee.style.height) || 0
+      };
+
+      this.currentMarquee.style.display = 'none';
+
+      // Minimum selection threshold
+      if (mRect.width > 24 && mRect.height > 14) {
+        const selectedTokens = [];
+        const tokenElements = this.overlay.querySelectorAll('.lens-word-token');
+        tokenElements.forEach(el => {
+          const tLeft = parseFloat(el.style.left) || 0;
+          const tTop = parseFloat(el.style.top) || 0;
+          const tWidth = parseFloat(el.style.width) || 0;
+          const tHeight = parseFloat(el.style.height) || 0;
+
+          // Check intersection
+          if (
+            tLeft < mRect.left + mRect.width &&
+            tLeft + tWidth > mRect.left &&
+            tTop < mRect.top + mRect.height &&
+            tTop + tHeight > mRect.top
+          ) {
+            selectedTokens.push({
+              text: el.dataset.text || '',
+              top: tTop,
+              left: tLeft
+            });
+          }
+        });
+
+        if (selectedTokens.length > 0) {
+          // Sort top-to-bottom, left-to-right
+          selectedTokens.sort((a, b) => {
+            if (Math.abs(a.top - b.top) > 10) return a.top - b.top;
+            return a.left - b.left;
+          });
+          const combinedText = selectedTokens.map(t => t.text).join(' ');
+          this.highlightRegion(mRect.left, mRect.top, mRect.width, mRect.height);
+          this.openImportModal(combinedText);
+        }
+      }
+    };
+
+    // Mouse events
+    this.overlay.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('lens-line-box') || e.target.classList.contains('lens-word-token')) return;
+      startDrag(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (this.isDragging) moveDrag(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseup', endDrag);
+
+    // Touch events for mobile devices
+    this.overlay.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      if (e.target.classList.contains('lens-line-box') || e.target.classList.contains('lens-word-token')) return;
+      startDrag(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    this.overlay.addEventListener('touchmove', (e) => {
+      if (!this.isDragging || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      moveDrag(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    this.overlay.addEventListener('touchend', endDrag);
+  }
+
+  highlightRegion(left, top, width, height) {
+    this.clearSelectionHighlights();
+    const box = document.createElement('div');
+    box.className = 'lens-line-box active';
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+    box.style.width = `${width}px`;
+    box.style.height = `${height}px`;
+
+    // Attach blue circular handles
+    this.attachHandlesToElement(box);
+    this.overlay.appendChild(box);
+  }
+
+  attachHandlesToElement(boxElement) {
+    boxElement.querySelectorAll('.lens-handle').forEach(h => h.remove());
+
+    const handleTL = document.createElement('div');
+    handleTL.className = 'lens-handle top-left';
+    const handleTR = document.createElement('div');
+    handleTR.className = 'lens-handle top-right';
+    const handleBL = document.createElement('div');
+    handleBL.className = 'lens-handle bottom-left';
+    const handleBR = document.createElement('div');
+    handleBR.className = 'lens-handle bottom-right';
+
+    boxElement.appendChild(handleTL);
+    boxElement.appendChild(handleTR);
+    boxElement.appendChild(handleBL);
+    boxElement.appendChild(handleBR);
+  }
+
+  clearSelectionHighlights() {
+    if (!this.overlay) return;
+    this.overlay.querySelectorAll('.lens-line-box.active').forEach(b => {
+      b.classList.remove('active');
+      b.querySelectorAll('.lens-handle').forEach(h => h.remove());
+    });
+    this.overlay.querySelectorAll('.lens-word-token.selected').forEach(t => t.classList.remove('selected'));
   }
 
   initPopover() {
@@ -698,26 +863,63 @@ class GoogleLensMapper {
   }
 
   /**
-   * Render Google Lens bounding box tokens over the rendered image
+   * Render Google Lens bounding box tokens & line boxes over the rendered image
    */
   renderTokens(ocrResult, originalImageWidth, originalImageHeight) {
     if (!this.overlay || !this.image) return;
 
     this.overlay.innerHTML = '';
     this.currentWords = ocrResult.words || [];
+    this.currentLines = ocrResult.lines || [];
     this.selectedWords = [];
     this.hidePopover();
 
-    if (!this.currentWords.length) return;
+    if (!this.currentWords.length && !this.currentLines.length) return;
 
     // Compute display scaling
     const rect = this.image.getBoundingClientRect();
-    const displayWidth = rect.width;
-    const displayHeight = rect.height;
+    const displayWidth = rect.width || this.image.clientWidth;
+    const displayHeight = rect.height || this.image.clientHeight;
 
     const scaleX = displayWidth / (originalImageWidth || displayWidth);
     const scaleY = displayHeight / (originalImageHeight || displayHeight);
 
+    // 1. Render Line-level Bounding Boxes (for full phrases like Title, Publisher, Author)
+    if (this.currentLines && this.currentLines.length > 0) {
+      this.currentLines.forEach((lineObj, idx) => {
+        if (!lineObj.text || !lineObj.bbox) return;
+
+        const lineBox = document.createElement('div');
+        lineBox.className = 'lens-line-box';
+        lineBox.dataset.lineIndex = idx;
+        lineBox.dataset.text = lineObj.text;
+        lineBox.title = `Click to select & import: "${lineObj.text}"`;
+
+        const b = lineObj.bbox;
+        const left = Math.max(0, b.x0 * scaleX);
+        const top = Math.max(0, b.y0 * scaleY);
+        const width = Math.max(20, (b.x1 - b.x0) * scaleX);
+        const height = Math.max(16, (b.y1 - b.y0) * scaleY);
+
+        lineBox.style.left = `${left}px`;
+        lineBox.style.top = `${top}px`;
+        lineBox.style.width = `${width}px`;
+        lineBox.style.height = `${height}px`;
+
+        lineBox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.clearSelectionHighlights();
+          lineBox.classList.add('active');
+          this.attachHandlesToElement(lineBox);
+          this.selectedWords = [lineObj.text];
+          this.openImportModal(lineObj.text);
+        });
+
+        this.overlay.appendChild(lineBox);
+      });
+    }
+
+    // 2. Render Word tokens
     this.currentWords.forEach((wordObj, idx) => {
       const token = document.createElement('div');
       token.className = 'lens-word-token';
@@ -749,8 +951,7 @@ class GoogleLensMapper {
     const isMultiSelect = event.shiftKey || event.metaKey || event.ctrlKey;
 
     if (!isMultiSelect) {
-      // Clear previous selections unless multi-selecting
-      this.overlay.querySelectorAll('.lens-word-token.selected').forEach(t => t.classList.remove('selected'));
+      this.clearSelectionHighlights();
       this.selectedWords = [wordObj.text];
       tokenElement.classList.add('selected');
     } else {
@@ -764,7 +965,106 @@ class GoogleLensMapper {
     }
 
     const selectedPhrase = this.selectedWords.join(' ');
+    this.openImportModal(selectedPhrase);
     this.showPopover(selectedPhrase, tokenElement);
+  }
+
+  /**
+   * Open the dedicated "Select Field & Import" Modal
+   */
+  openImportModal(text, suggestedField = null) {
+    if (!text || !text.trim()) return;
+    const cleanText = text.trim();
+
+    const modal = document.getElementById('textImportModal');
+    const textarea = document.getElementById('importModalSelectedText');
+    const fieldSelect = document.getElementById('importModalTargetField');
+
+    if (!modal || !textarea || !fieldSelect) {
+      // Fallback to quick assignment prompt
+      return;
+    }
+
+    textarea.value = cleanText;
+
+    const targetField = suggestedField || this.guessFieldForText(cleanText);
+    if (targetField) {
+      fieldSelect.value = targetField;
+    }
+
+    modal.classList.add('active');
+
+    // Wire confirm import button
+    const confirmBtn = document.getElementById('confirmTextImportBtn');
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        const finalText = textarea.value.trim();
+        const chosenField = fieldSelect.value;
+        if (finalText && chosenField) {
+          if (this.onFieldAssignedCallback) {
+            this.onFieldAssignedCallback(chosenField, finalText);
+          }
+          modal.classList.remove('active');
+          window.app.showToast(`Imported to "${chosenField}"!`, 'success');
+        }
+      };
+    }
+  }
+
+  /**
+   * Intelligent heuristic guessing of target column for a text snippet
+   */
+  guessFieldForText(text) {
+    if (!text) return 'Title';
+    const clean = text.trim();
+
+    // ISBN (10 or 13 digits with dashes or numbers)
+    if (/(?:97[89][-\s]?)?[0-9]{1,5}[-\s]?[0-9]+[-\s]?[0-9]+[-\s]?[0-9X]/i.test(clean) && clean.replace(/[^0-9X]/gi, '').length >= 10) {
+      return 'ISBN';
+    }
+
+    // Publication Year (4 digits 1900-2099)
+    if (/^\b(19\d{2}|20\d{2})\b$/.test(clean)) {
+      return 'Year';
+    }
+
+    // Edition
+    if (/\b(?:1st|2nd|3rd|[4-9]th|first|second|third|revised|special|edition|ed\.)\b/i.test(clean)) {
+      return 'Edition';
+    }
+
+    // Publisher (Publications, Press, Books, Imprint, or specific known publishers)
+    if (/\b(?:publication|publisher|press|books|publishing|pearson|mcgraw|wiley|springer|r\.\s*publications)\b/i.test(clean)) {
+      return 'Publisher';
+    }
+
+    // Publisher Place (Indian / International Cities)
+    if (/\b(?:chennai|delhi|new delhi|mumbai|bengaluru|kolkata|london|new york|cambridge|boston)\b/i.test(clean)) {
+      return 'Publisher Place';
+    }
+
+    // Department (Engineering branches, Academic departments)
+    if (/\b(?:ece|cse|it|eee|mech|civil|branch|department|engineering|computer science|electronics)\b/i.test(clean)) {
+      return 'Department';
+    }
+
+    // Author (starts with Dr., Prof., M., or contains author keywords)
+    if (/\b(?:by|author|dr\.|prof\.|m\.\s*auxilia|john smith|boylestad)\b/i.test(clean) || (clean.split(/\s+/).length <= 4 && /^[A-Z][a-z]+(\s+[A-Z][a-z]+)+$/.test(clean))) {
+      return 'Author 1';
+    }
+
+    // Price
+    if (/(?:[$€£₹]|rs\.?|inr|usd)\s*[0-9]+/i.test(clean)) {
+      return 'Price';
+    }
+
+    // Call No / DC
+    if (/\b(?:\d{3}(?:\.\d+)?\s+[A-Z]{2,4})\b/.test(clean)) {
+      return 'Call No/DC';
+    }
+
+    // Default to Title
+    return 'Title';
   }
 
   showPopover(text, anchorElement) {
@@ -863,14 +1163,15 @@ class GoogleLensMapper {
 
     // 5. Publisher Detection (heuristic matching well-known publishers or "Press", "Publishing", "Books")
     const publisherKeywords = [
-      'Academic Press', 'Pearson', 'McGraw-Hill', 'McGraw Hill', 'O\'Reilly', 
-      'Wiley', 'John Wiley & Sons', 'Springer', 'Cambridge University Press', 
-      'Oxford University Press', 'MIT Press', 'Elsevier', 'Routledge', 
-      'Prentice Hall', 'Cengage', 'Tech Books', 'CRC Press', 'Addison-Wesley',
+      'R. Publications', 'R.Publications', 'Charulatha Publications', 'Anuradha Publications',
+      'Lakshmi Publications', 'Tata McGraw-Hill', 'McGraw Hill', 'S. Chand', 'Dhanpat Rai',
+      'Khanna Publishers', 'Academic Press', 'Pearson', 'O\'Reilly', 'Wiley', 'John Wiley & Sons',
+      'Springer', 'Cambridge University Press', 'Oxford University Press', 'MIT Press', 'Elsevier',
+      'Routledge', 'Prentice Hall', 'Cengage', 'Tech Books', 'CRC Press', 'Addison-Wesley',
       'Bloomsbury', 'Penguin', 'HarperCollins', 'Scholastic'
     ];
     for (const pub of publisherKeywords) {
-      if (new RegExp(pub, 'i').test(fullText)) {
+      if (new RegExp(pub.replace('.', '\\.'), 'i').test(fullText)) {
         result['Publisher'] = pub;
         break;
       }
@@ -879,10 +1180,48 @@ class GoogleLensMapper {
       const pubLineMatch = fullText.match(/(?:Publisher|Published by|Imprint):\s*([^,.\n]+)/i);
       if (pubLineMatch && pubLineMatch[1]) {
         result['Publisher'] = pubLineMatch[1].trim();
+      } else {
+        // Fallback: check for any line ending with Publications / Press / Books
+        for (const line of lines) {
+          if (/\b(?:Publications|Publishing|Press|Books)\b/i.test(line) && line.length < 50) {
+            result['Publisher'] = line.replace(/\b(?:chennai|delhi|mumbai)\b/gi, '').trim();
+            break;
+          }
+        }
       }
     }
 
-    // 6. Author Detection
+    // 5.1 Publisher Place
+    const cities = ['Chennai', 'New Delhi', 'Delhi', 'Mumbai', 'Bengaluru', 'Bangalore', 'Kolkata', 'Hyderabad', 'London', 'New York', 'Cambridge', 'Boston'];
+    for (const city of cities) {
+      if (new RegExp('\\b' + city + '\\b', 'i').test(fullText)) {
+        result['Publisher Place'] = city;
+        break;
+      }
+    }
+
+    // 6. Department Detection (e.g., ECE, CSE, IT, EEE, Mechanical, Civil)
+    if (/\b(?:ECE|Electronics\s*(?:and|&)\s*Communication)\b/i.test(fullText)) {
+      result['Department'] = 'Electronics & Communication Engineering';
+      result['Department Code'] = 'ECE';
+    } else if (/\b(?:CSE|Computer Science)\b/i.test(fullText)) {
+      result['Department'] = 'Computer Science & Engineering';
+      result['Department Code'] = 'CSE';
+    } else if (/\b(?:IT|Information Technology)\b/i.test(fullText)) {
+      result['Department'] = 'Information Technology';
+      result['Department Code'] = 'IT';
+    } else if (/\b(?:EEE|Electrical\s*(?:and|&)\s*Electronics)\b/i.test(fullText)) {
+      result['Department'] = 'Electrical & Electronics Engineering';
+      result['Department Code'] = 'EEE';
+    } else if (/\b(?:Mech|Mechanical)\b/i.test(fullText)) {
+      result['Department'] = 'Mechanical Engineering';
+      result['Department Code'] = 'MECH';
+    } else if (/\b(?:Civil)\b/i.test(fullText)) {
+      result['Department'] = 'Civil Engineering';
+      result['Department Code'] = 'CIVIL';
+    }
+
+    // 7. Author Detection
     const authorPattern = /(?:by|author[s]?:\s*|written by\s*)([A-Z][a-zA-Z\s.,&]+?)(?=\n|publisher|edition|isbn|$)/i;
     const authorMatch = fullText.match(authorPattern);
     if (authorMatch && authorMatch[1]) {
@@ -891,18 +1230,39 @@ class GoogleLensMapper {
       if (authors[1]) result['Auth 2'] = authors[1];
       if (authors[2]) result['Auth 3'] = authors[2];
     }
+    // Specific author check for textbook covers like "M. AUXILIA"
+    if (!result['Author 1']) {
+      for (const line of lines) {
+        // Skip publisher lines, cities, and boilerplate
+        if (/isbn|copyright|edition|publications|publishing|publisher|press|books|chennai|delhi|mumbai|syllabus|anna university|semester/i.test(line)) continue;
+        if (result['Publisher'] && line.toLowerCase().includes(result['Publisher'].toLowerCase())) continue;
+        
+        if (/^(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)\s+[A-Za-z.\s]+$/i.test(line) && line.length < 40) {
+          result['Author 1'] = line.trim();
+          break;
+        } else if (/^[A-Z]\.\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?$/i.test(line) && line.length < 35) {
+          result['Author 1'] = line.trim();
+          break;
+        }
+      }
+    }
 
-    // 7. Title Heuristics
-    // Often the first or second prominent non-trivial line in book front matter
-    for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    // 8. Title Heuristics
+    // Look for prominent subject / title line (all caps or prominent title casing)
+    for (let i = 0; i < Math.min(lines.length, 6); i++) {
       const line = lines[i];
-      // Skip if line looks like an author, ISBN, or generic header
-      if (/isbn|copyright|edition|all rights|volume|printed/i.test(line)) continue;
-      if (line.length > 4 && line.length < 120 && !result['Title']) {
-        // Strip leading "Title:" if present
+      // Skip boilerplate lines (syllabus, Anna Univ, author, publisher, semester)
+      if (/isbn|copyright|edition|all rights|volume|printed|semester|branch|syllabus|anna university|question paper|solved/i.test(line)) continue;
+      if (line.length >= 5 && line.length < 120 && !result['Title']) {
         result['Title'] = line.replace(/^Title:\s*/i, '').trim();
         break;
       }
+    }
+
+    // 9. Notes CD / Supplementary Book / Syllabus notes
+    const syllabusMatch = fullText.match(/(?:Anna University|With Solved|Question Papers|Includes CD|CD-ROM)[^.\n]*/i);
+    if (syllabusMatch) {
+      result['Notes CD/Supplementary Book'] = syllabusMatch[0].trim();
     }
 
     // 8. Call No / DC Detection (Dewey Decimal or LC format like 005.133 or QA76.73)
@@ -1998,6 +2358,18 @@ class ScannerController {
     const autoMapBtn = document.getElementById('autoMapBtn');
     if (autoMapBtn) {
       autoMapBtn.addEventListener('click', () => this.runAutoMapping());
+    }
+
+    // Recognition Model Selector
+    const modelSelector = document.getElementById('ocrModelSelector');
+    if (modelSelector) {
+      modelSelector.addEventListener('change', (e) => {
+        const modelName = e.target.options[e.target.selectedIndex].text;
+        window.app.showToast(`Recognition Model: ${modelName}`, 'info');
+        if (this.currentOcrResult && this.currentOcrResult.text) {
+          this.runAutoMapping();
+        }
+      });
     }
 
     // Save Book Form Submission
