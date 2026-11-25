@@ -122,6 +122,28 @@
       }
     };
 
+    window.toggleCameraFullscreen = function(force) {
+      var camBox = document.getElementById('cameraViewSection');
+      var icon = document.getElementById('fullscreenBtnIcon');
+      var text = document.getElementById('fullscreenBtnText');
+      if (!camBox) return;
+
+      var isFull = typeof force === 'boolean' ? force : !camBox.classList.contains('is-fullscreen');
+      camBox.classList.toggle('is-fullscreen', isFull);
+      if (icon) icon.textContent = isFull ? '✕' : '⛶';
+      if (text) text.textContent = isFull ? 'Exit' : 'Full Screen';
+      
+      if (window.app && window.app.showToast) {
+        window.app.showToast(isFull ? 'Entered Fullscreen Camera' : 'Exited Fullscreen Camera', 'info');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.innerWidth <= 768 && typeof window.switchScannerMobileMode === 'function') {
+        window.switchScannerMobileMode('camera');
+      }
+    });
+
     window.switchView = function(route) {
       if (window.app && typeof window.app.navigate === 'function') {
         window.app.navigate(route);
@@ -150,6 +172,11 @@
         var s = document.getElementById('topbarPageSubtitle');
         if (t) t.textContent = titleMap[route][0];
         if (s) s.textContent = titleMap[route][1];
+      }
+      if (route === 'scanner') {
+        if (window.innerWidth <= 768 && typeof window.switchScannerMobileMode === 'function') {
+          window.switchScannerMobileMode('camera');
+        }
       }
       var sidebar = document.getElementById('appSidebar');
       if (sidebar) sidebar.classList.remove('show');
@@ -731,6 +758,15 @@
                 <div class="camera-viewport-wrap">
                   <video id="cameraVideo" autoplay playsinline muted></video>
                   <canvas id="scannerCanvas"></canvas>
+
+                  <!-- Top Camera Floating Controls (Fullscreen & Status) -->
+                  <div class="camera-top-floating-bar">
+                    <button type="button" class="camera-floating-pill" id="cameraToggleFullscreenBtn" onclick="window.toggleCameraFullscreen()">
+                      <span id="fullscreenBtnIcon">⛶</span>
+                      <span id="fullscreenBtnText">Full Screen</span>
+                    </button>
+                    <span class="camera-floating-badge" id="cameraResolutionBadge">HD Live</span>
+                  </div>
                   
                   <!-- Framing Guide Overlay for Book Pages -->
                   <div class="viewfinder-guide-overlay">
@@ -740,16 +776,20 @@
 
                 <!-- Camera Controls Toolbar -->
                 <div class="camera-controls-bar">
-                  <button class="camera-sub-btn" id="torchBtn" title="Toggle Flash / Torch">
+                  <button type="button" class="camera-sub-btn" id="torchBtn" title="Toggle Flash / Torch">
                     💡
                   </button>
 
-                  <button class="camera-shutter-btn" id="shutterBtn" title="Capture Book Page">
+                  <button type="button" class="camera-shutter-btn" id="shutterBtn" title="Capture Book Page">
                     <div class="camera-shutter-inner"></div>
                   </button>
 
-                  <button class="camera-sub-btn" id="switchCamBtn" title="Switch Front/Rear Camera">
+                  <button type="button" class="camera-sub-btn" id="switchCamBtn" title="Switch Front/Rear Camera">
                     🔄
+                  </button>
+
+                  <button type="button" class="camera-sub-btn" id="fullscreenCamBtn" onclick="window.toggleCameraFullscreen()" title="Full Screen View">
+                    ⛶
                   </button>
                 </div>
               </div>

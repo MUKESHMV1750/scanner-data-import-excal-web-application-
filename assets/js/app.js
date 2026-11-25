@@ -171,6 +171,9 @@ class App {
     } else if (route === 'scanner') {
       this.setPageTitle('Mobile Book Scanner', 'Scan printed pages with camera and map to 27 Excel fields');
       this.scannerCtrl.startCamera();
+      if (window.innerWidth <= 768 && typeof window.switchScannerMobileMode === 'function') {
+        window.switchScannerMobileMode('camera');
+      }
     } else if (route === 'books') {
       this.setPageTitle('Book Records', 'Manage, search, edit and verify stored book records');
       this.booksMgr.loadBooks();

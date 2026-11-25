@@ -2489,13 +2489,16 @@ class ScannerController {
   captureImage() {
     if (!this.videoElement || !this.canvasElement) return;
 
-    // Play shutter sound effect
-    window.app.playShutterSound();
+    // Play tactile vibration & shutter sound effect
+    try {
+      if (navigator.vibrate) navigator.vibrate(60);
+      window.app.playShutterSound();
+    } catch (e) {}
 
     const video = this.videoElement;
     const canvas = this.canvasElement;
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = video.videoWidth || video.clientWidth || 1280;
+    canvas.height = video.videoHeight || video.clientHeight || 720;
 
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -2503,12 +2506,22 @@ class ScannerController {
     // Stop video stream after capture to conserve battery
     this.stopCamera();
 
-    // Export image
-    canvas.toBlob((blob) => {
-      this.capturedBlob = blob;
+    // If camera was in fullscreen mode, exit fullscreen smoothly
+    if (typeof window.toggleCameraFullscreen === 'function') {
+      window.toggleCameraFullscreen(false);
+    }
+
+    // Export image immediately so UI responds instantaneously
+    try {
       this.capturedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      canvas.toBlob((blob) => {
+        this.capturedBlob = blob;
+      }, 'image/jpeg', 0.92);
       this.processCapturedImage(this.capturedDataUrl, canvas.width, canvas.height);
-    }, 'image/jpeg', 0.92);
+    } catch (err) {
+      console.error('Error generating image from canvas:', err);
+      window.app.showToast('Could not process camera image. Please try again.', 'error');
+    }
   }
 
   handleImageUpload(e) {
@@ -3052,6 +3065,9 @@ class App {
     } else if (route === 'scanner') {
       this.setPageTitle('Mobile Book Scanner', 'Scan printed pages with camera and map to 27 Excel fields');
       this.scannerCtrl.startCamera();
+      if (window.innerWidth <= 768 && typeof window.switchScannerMobileMode === 'function') {
+        window.switchScannerMobileMode('camera');
+      }
     } else if (route === 'books') {
       this.setPageTitle('Book Records', 'Manage, search, edit and verify stored book records');
       this.booksMgr.loadBooks();
